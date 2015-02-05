@@ -387,7 +387,7 @@ def run(options, root, testsys, cpu_class):
             # enable/disable vulnerability analysis VUL
             if options.vul_analysis == "yes":
                 switch_cpus[i].vul_analysis = 1
-
+				
             #YOHAN: Option to inject fault
             if options.injectArch == "ROB":
                 switch_cpus[i].injectFaultROB = 1
@@ -395,6 +395,14 @@ def run(options, root, testsys, cpu_class):
                 switch_cpus[i].injectLoc = options.injectLoc
             if options.injectArch == "RF":
                 switch_cpus[i].injectFaultRF = 1
+                switch_cpus[i].injectTime = options.injectTime
+                switch_cpus[i].injectLoc = options.injectLoc
+            if options.injectArch == "FetchQueue":
+                switch_cpus[i].injectFaultFQ = 1
+                switch_cpus[i].injectTime = options.injectTime
+                switch_cpus[i].injectLoc = options.injectLoc
+            if options.injectArch == "DecodeQueue":
+                switch_cpus[i].injectFaultDQ = 1
                 switch_cpus[i].injectTime = options.injectTime
                 switch_cpus[i].injectLoc = options.injectLoc
 

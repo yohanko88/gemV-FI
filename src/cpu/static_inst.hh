@@ -79,6 +79,8 @@ class StaticInst : public RefCounted
     typedef TheISA::ExtMachInst ExtMachInst;
     /// Logical register index type.
     typedef TheISA::RegIndex RegIndex;
+    
+    int getMRI() const { return TheISA::Max_Reg_Index; }
 
     enum {
         MaxInstSrcRegs = TheISA::MaxInstSrcRegs,        //< Max source regs
@@ -260,18 +262,109 @@ class StaticInst : public RefCounted
     void setLastMicroop() { flags[IsLastMicroop] = true; }
     void setDelayedCommit() { flags[IsDelayedCommit] = true; }
     void setFlag(Flags f) { flags[f] = true; }
+	
 
     /// Operation class.  Used to select appropriate function unit in issue.
     OpClass opClass()     const { return _opClass; }
-
+	
+	//YOHAN /// Set Operation class
+    void setOpClass(int i) {
+        if(i==1)
+            _opClass = IntAluOp;
+        else if (i==2)
+            _opClass = IntMultOp;
+        else if (i==3)
+            _opClass = IntDivOp;
+        else if (i==4)
+            _opClass = FloatAddOp;
+        else if (i==5)
+            _opClass = FloatCmpOp;
+        else if (i==6)
+            _opClass = FloatCvtOp;
+        else if (i==7)
+            _opClass = FloatMultOp;
+        else if (i==8)
+            _opClass = FloatDivOp;
+        else if (i==9)
+            _opClass = FloatSqrtOp;
+        else if (i==10)
+            _opClass = SimdAddOp;
+        else if (i==11)
+            _opClass = SimdAddAccOp;
+        else if (i==12)
+            _opClass = SimdAluOp;
+        else if (i==13)
+            _opClass = SimdCmpOp;
+        else if (i==14)
+            _opClass = SimdCvtOp;
+        else if (i==15)
+            _opClass = SimdMiscOp;
+        else if (i==16)
+            _opClass = SimdMultOp;
+        else if (i==17)
+            _opClass = SimdMultAccOp;
+        else if (i==18)
+            _opClass = SimdShiftOp;
+        else if (i==19)
+            _opClass = SimdShiftAccOp;
+        else if (i==20)
+            _opClass = SimdSqrtOp;
+        else if (i==21)
+            _opClass = SimdFloatAddOp;
+        else if (i==22)
+            _opClass = SimdFloatAluOp;
+        else if (i==23)
+            _opClass = SimdFloatCmpOp;
+        else if (i==24)
+            _opClass = SimdFloatCvtOp;
+        else if (i==25)
+            _opClass = SimdFloatDivOp;
+        else if (i==26)
+            _opClass = SimdFloatMiscOp;
+        else if (i==27)
+            _opClass = SimdFloatMultOp;
+        else if (i==28)
+            _opClass = SimdFloatMultAccOp;
+        else if (i==29)
+            _opClass = SimdFloatSqrtOp;
+        else if (i==30)
+            _opClass = MemReadOp;
+        else if (i==31)
+            _opClass = MemWriteOp;
+        else if (i==32)
+            _opClass = IprAccessOp;
+        else if (i==33)
+            _opClass = InstPrefetchOp;
+    }
+    
+    /// Set Operation class.
+    /* void setOpClass(int x) {
+        OpClass y = x;
+        _opClass = y;
+    }
+ */
 
     /// Return logical index (architectural reg num) of i'th destination reg.
     /// Only the entries from 0 through numDestRegs()-1 are valid.
     RegIndex destRegIdx(int i) const { return _destRegIdx[i]; }
 
+    /// Set logical index (architectural reg num) of i'th destination reg. //YOHAN
+    void setDestRegIdx(int i, RegIndex j) { _destRegIdx[i] = j; }
+
     /// Return logical index (architectural reg num) of i'th source reg.
     /// Only the entries from 0 through numSrcRegs()-1 are valid.
     RegIndex srcRegIdx(int i)  const { return _srcRegIdx[i]; }
+    
+    /// Set logical index (architectural reg num) of i'th destination reg. //YOHAN
+    void setSrcRegIdx(int i, RegIndex j) { _srcRegIdx[i] = j; }
+    
+    /// Flip the flag bits //YOHAN
+    void flipFlags(int i) {
+        if(flags[i])
+            flags[i] = false;
+        else
+            flags[i] = true;
+    }
 
     /// Pointer to a statically allocated "null" instruction object.
     /// Used to give eaCompInst() and memAccInst() something to return

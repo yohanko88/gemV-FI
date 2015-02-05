@@ -122,15 +122,10 @@ BaseDynInst<Impl>::initVars()
 #endif
         assert(cpu->instcount <= 1500);
     }
-    
-	std::string sym_str;
-    Addr sym_addr;
-	Addr cur_pc = pc.instAddr();
-	debugSymbolTable->findNearestSymbol(cur_pc, sym_str, sym_addr);
 
     DPRINTF(DynInst,
-        "DynInst: [sn:%lli] Instruction created. Instcount for %s = %i :%s\n",
-        seqNum, cpu->name(), cpu->instcount, sym_str);
+        "DynInst: [sn:%lli] Instruction created. Instcount for %s = %i\n",
+        seqNum, cpu->name(), cpu->instcount);
 #endif
 
 #ifdef DEBUG
@@ -141,7 +136,7 @@ BaseDynInst<Impl>::initVars()
 
     //VUL_TRACKER
     vulT.initVars(numDestRegs(),numSrcRegs(),sizeof(pcState()),
-                            cpu->totalNumRegs);
+                            cpu->totalNumRegs, this->seqNum);
 }
 
 template <class Impl>

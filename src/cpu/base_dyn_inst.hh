@@ -373,7 +373,7 @@ class BaseDynInst : public RefCounted
     PhysRegIndex renamedDestRegIdx(int idx)
     {
         //VUL_TRACKER
-        vulT.vulOnRead(INST_RNMDESTREGSIDX, idx);
+        vulT.vulOnRead(INST_RNMDESTREGSIDX, this->seqNum, idx);
         return _destRegIdx[idx];
     }
 
@@ -382,7 +382,7 @@ class BaseDynInst : public RefCounted
     {
         assert(TheISA::MaxInstSrcRegs > idx);
         //VUL_TRACKER
-        vulT.vulOnRead(INST_RNMSRCREGSIDX, idx);
+        vulT.vulOnRead(INST_RNMSRCREGSIDX, this->seqNum, idx);
         return _srcRegIdx[idx];
     }
 
@@ -391,7 +391,7 @@ class BaseDynInst : public RefCounted
      */
     TheISA::RegIndex flattenedDestRegIdx(int idx)
     {
-        vulT.vulOnRead(INST_FLTDESTREGSIDX, idx);
+        vulT.vulOnRead(INST_FLTDESTREGSIDX, this->seqNum, idx);
         return _flatDestRegIdx[idx];
     }
 
@@ -400,7 +400,7 @@ class BaseDynInst : public RefCounted
      */
     PhysRegIndex prevDestRegIdx(int idx)
     {
-        vulT.vulOnRead(INST_PRVDESTREGSIDX, idx);
+        vulT.vulOnRead(INST_PRVDESTREGSIDX, this->seqNum, idx);
         return _prevDestRegIdx[idx];
     }
 
@@ -414,8 +414,8 @@ class BaseDynInst : public RefCounted
         _destRegIdx[idx] = renamed_dest;
         _prevDestRegIdx[idx] = previous_rename;
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_RNMDESTREGSIDX, idx);
-        vulT.vulOnWrite(INST_PRVDESTREGSIDX, idx);
+        vulT.vulOnWrite(INST_RNMDESTREGSIDX, this->seqNum, idx);
+        vulT.vulOnWrite(INST_PRVDESTREGSIDX, this->seqNum, idx);
     }
 
     /** Renames a source logical register to the physical register which
@@ -426,7 +426,7 @@ class BaseDynInst : public RefCounted
     {
         _srcRegIdx[idx] = renamed_src;
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_RNMSRCREGSIDX, idx);
+        vulT.vulOnWrite(INST_RNMSRCREGSIDX, this->seqNum, idx);
     }
 
     /** Flattens a destination architectural register index into a logical
@@ -436,7 +436,7 @@ class BaseDynInst : public RefCounted
     {
         _flatDestRegIdx[idx] = flattened_dest;
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_FLTDESTREGSIDX, idx);
+        vulT.vulOnWrite(INST_FLTDESTREGSIDX, this->seqNum, idx);
     }
     /** BaseDynInst constructor given a binary instruction.
      *  @param staticInst A StaticInstPtr to the underlying instruction.
@@ -491,13 +491,13 @@ class BaseDynInst : public RefCounted
     void setPredTarg(const TheISA::PCState &_predPC)
     {
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_PREDPC);
+        vulT.vulOnWrite(INST_PREDPC, this->seqNum);
         predPC = _predPC;
     }
 
     const TheISA::PCState &readPredTarg() { 
         //VUL_TRACKER
-        vulT.vulOnRead(INST_PREDPC);
+        vulT.vulOnRead(INST_PREDPC, this->seqNum);
         return predPC; }
 
     /** Returns the predicted PC immediately after the branch. */
@@ -600,6 +600,37 @@ class BaseDynInst : public RefCounted
 
     /** Returns the opclass of this instruction. */
     OpClass opClass() const { return staticInst->opClass(); }
+    
+    /** Set the opclass of this instruction. */ //YOHAN
+    void setOpClass(int i) {
+        int x = staticInst->opClass();
+        x = x+i;
+        if(x>33)
+            x = x-33;
+        staticInst->setOpClass(x);
+    }
+	    
+    /// Flip the flag bits //YOHAN
+    void flipFlags(int i) {
+        if(i<MaxFlags) { //12
+            if(instFlags[i])
+                instFlags[i] = false;
+            else
+                instFlags[i] = true;
+        }
+        else if (i>=MaxFlags && i<NumStatus+MaxFlags) { //21
+            if(status[i-MaxFlags])
+                status[i-MaxFlags] = false;
+            else
+                status[i-MaxFlags] = true;
+        }
+        else
+            return staticInst->flipFlags(i-MaxFlags-NumStatus); //40
+    }
+    
+    int getMRI() const { return staticInst-> getMRI(); }
+    int getMaxInstSrcRegs() const { return staticInst->MaxInstSrcRegs; }
+    int getMaxInstDestRegs() const { return staticInst->MaxInstDestRegs; }
 
     /** Returns the branch target address. */
     TheISA::PCState branchTarget() const
@@ -618,9 +649,20 @@ class BaseDynInst : public RefCounted
 
     /** Returns the logical register index of the i'th destination register. */
     RegIndex destRegIdx(int i) const { return staticInst->destRegIdx(i); }
-
+    
+    /** Set the logical register index of the i'th destination register. */ //YOHAN
+    void setDestRegIdx(int i, int j) {
+        RegIndex regID = j;
+        staticInst->setDestRegIdx(i, regID);
+    }
     /** Returns the logical register index of the i'th source register. */
     RegIndex srcRegIdx(int i) const { return staticInst->srcRegIdx(i); }
+    
+    /** Set the logical register index of the i'th source register. */ //YOHAN
+    void setSrcRegIdx(int i, int j) {
+        RegIndex regID = j;
+        staticInst->setSrcRegIdx(i, regID);
+    }
 
     /** Pops a result off the instResult queue */
     template <class T>
@@ -821,7 +863,7 @@ class BaseDynInst : public RefCounted
     /** Read the PC state of this instruction. */
     const TheISA::PCState pcState() { 
         //VUL_TRACKER
-        vulT.vulOnRead(INST_PC);
+        vulT.vulOnRead(INST_PC, this->seqNum);
         return pc; 
     }
 

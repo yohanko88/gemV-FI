@@ -70,7 +70,9 @@
 #include "base/vulnerability/vul_regfile.hh"                    //VUL_RF
 
 #include "base/vulnerability/vul_tracker.hh"                    //VUL_TRACKER
-#include "base/vulnerability/vul_structs.hh"
+#include "base/vulnerability/vul_structs.hh"                    //VUL_TRACKER
+#include "base/vulnerability/vul_pipeline.hh"                   //VUL_TRACKER
+#include "base/vulnerability/vul_rename.hh"                   //VUL_TRACKER
 
 template <class>
 class Checker;
@@ -808,15 +810,55 @@ class FullO3CPU : public BaseO3CPU
     Cycles lastRunningCycle;
 
     /** Register file vulnerability calculator */
-    RegVulCalc regVulCalc;                                  //VUL_RF
-	
-	 //YOHAN: Fault injection in Register File
+    RegVulCalc regVulCalc;                                  //VUL_TRACKER
+    
+     //YOHAN: Fault injection in Register File
     unsigned injectFaultRF;
+    unsigned injectFaultFQ;
+    unsigned injectFaultDQ;
     unsigned injectTime;
     unsigned injectLoc;
+    
+    //YOHAN
+    bool changeDest;
+    bool changeSrc;
+    unsigned oldDestReg;
+    unsigned oldDestIdx;
+    unsigned oldSrcReg;
+    unsigned oldSrcIdx;
+    Addr oldPC;
+    Addr oldMicroPC;
+    std::string oldInst;
+
+    /** Fetch Queue vulnerability calculator */
+    PipeVulTracker pipeVulT;
+
+    /** Fetch Queue vulnerability calculator */
+    RenameVulCalc renameVulT;
 
     /** Enable/disable vulnerability analysis */
-    bool enableVulAnalysis;                                 //VUL
+    bool enableVulAnalysis;                                 //VUL_TRACKER
+
+    /** Enable/disable vulnerability analysis */
+    bool robVulEnable;                                       //VUL_TRACKER
+
+    /** Enable/disable vulnerability analysis */
+    bool rfVulEnable;                                       //VUL_TRACKER
+
+    /** Enable/disable vulnerability analysis */
+    bool cacheVulEnable;                                       //VUL_TRACKER
+
+    /** Enable/disable vulnerability analysis */
+    bool iqVulEnable;                                       //VUL_TRACKER
+
+    /** Enable/disable vulnerability analysis */
+    bool lsqVulEnable;                                       //VUL_TRACKER
+
+    /** Enable/disable vulnerability analysis */
+    bool pipeVulEnable;                                       //VUL_TRACKER
+
+    /** Enable/disable vulnerability analysis */
+    bool renameVulEnable;                                       //VUL_TRACKER
 
     /** Ease of programming */
     int totalNumRegs;                                       //VUL_TRACKER
@@ -887,12 +929,6 @@ class FullO3CPU : public BaseO3CPU
     Stats::Scalar miscRegfileReads;
     Stats::Scalar miscRegfileWrites;
 
-    // Vulenerability stat
-    Stats::Scalar regFileVul;                                   //VUL_RF
-    // Vulnerability of commit rename map
-    Stats::Formula commitRenameMapVul;                          //VUL_RENAME
-    //Vulnerability of the Fetch Queue
-    Stats::Scalar fetchQueueVul;                                //VUL_TRACKER
 };
 
 #endif // __CPU_O3_CPU_HH__

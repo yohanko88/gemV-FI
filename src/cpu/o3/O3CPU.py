@@ -146,10 +146,19 @@ class DerivO3CPU(BaseCPU):
     #VUL
     vul_analysis = Param.Unsigned(1, "Enable/disable vulnerability analysis")
     fi_reg = Param.Unsigned(1, "Register number for fault injection")
+    rob_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
+    rf_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
+    cache_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
+    iq_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
+    lsq_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
+    pipeline_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
+    rename_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
 	
 	#YOHAN: Add parameters to inject a single-bit fault in ROB
     injectFaultROB = Param.Unsigned(0, "Inject a single-bit fault in ROB or not (0: NO, 1: YES)")
     injectFaultRF = Param.Unsigned(0, "Inject a single-bit fault in Register File or not (0: NO, 1: YES)")
+    injectFaultFQ = Param.Unsigned(0, "Inject a single-bit fault in Fetch Queue or not (0: NO, 1: YES)")
+    injectFaultDQ = Param.Unsigned(0, "Inject a single-bit fault in Decode Queue or not (0: NO, 1: YES)")
     injectTime = Param.Unsigned(0, "Time to inject fault")
     injectLoc = Param.Unsigned(0, "Bit location to inject fault")
 

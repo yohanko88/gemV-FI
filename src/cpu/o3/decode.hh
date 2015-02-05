@@ -118,6 +118,9 @@ class DefaultDecode
 
     /** Sets pointer to time buffer coming from fetch. */
     void setFetchQueue(TimeBuffer<FetchStruct> *fq_ptr);
+	
+	//YOHAN
+	void flipFetchQueue(unsigned injectLoc);
 
     /** Sets pointer to list of active threads. */
     void setActiveThreads(std::list<ThreadID> *at_ptr);

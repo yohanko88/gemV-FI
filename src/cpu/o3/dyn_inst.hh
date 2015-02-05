@@ -51,6 +51,7 @@
 #include "cpu/base_dyn_inst.hh"
 #include "cpu/inst_seq.hh"
 #include "cpu/reg_class.hh"
+#include "debug/FI.hh" //YOHAN
 
 class Packet;
 
@@ -78,6 +79,101 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     typedef TheISA::IntReg   IntReg;
     typedef TheISA::FloatReg FloatReg;
     typedef TheISA::FloatRegBits FloatRegBits;
+    
+    //YOHAN
+    int bitnumPC; //size of PC: 32 bits
+    int bitnumDestRegs; //size of architectural detination register: 11 bits X 8
+    int bitnumSrcRegs; // size of architectural destination register: 11 bits X 27
+    int bitnumSeqNum; // size of sequence number: 32 bits
+    int bitnumPredPC; // size of predicted next PC: 32 bits
+    int bitnumOpClass; // size of OpClass: 32 (since it has 33 OpClass)
+    int bitnumFlags; // size of flags (12 for flags of dynamic instruction, 21 for status of dynamic instruction, 40 for flags of static instruction
+    int bitnumPSrcRegs; // size of physical source register: 8 bits X 8
+    int bitnumPDestRegs; // size of physical destination register: 8 bits X 27
+    int bitnumDynInst; // sum of filed in dynamic instruction
+    
+    bool flipDynInst (int i) {
+        assert(i<bitnumDynInst);
+        if(i < bitnumPC) {
+            Addr newPC = this->instAddr() ^ (1UL << i);
+            DPRINTF(FI, "%llu & %d (PC): %#x to %#x\n", curTick(), this->seqNum, this->instAddr(), newPC);
+            this->pcState(newPC);
+            return true;
+        }
+        else if(i >= bitnumPC && i < bitnumPC+bitnumDestRegs && this->numDestRegs() != 0 ) {
+            int injectTarget = ((i-bitnumPC)/11) % (this->numDestRegs());
+            if(this->destRegIdx(injectTarget) < 16) {
+                this->cpu->changeDest = true;
+                this->cpu->oldDestReg = this->destRegIdx(injectTarget);
+                this->cpu->oldDestIdx = injectTarget;
+                this->cpu->oldPC = this->instAddr();
+                this->cpu->oldInst = this->staticInst->disassemble(this->instAddr());
+                this->cpu->oldMicroPC = this->microPC();
+                int newDestReg = (this->destRegIdx(injectTarget)) ^ (1UL << ((i-bitnumPC)%4));
+                DPRINTF(FI, "%llu & %d (Architectural Destination Register): %d to %d\n", curTick(), this->seqNum, this->destRegIdx(injectTarget), newDestReg);
+                this->setDestRegIdx(injectTarget, newDestReg);
+                return true;
+            }
+        }
+        else if(i >= bitnumPC+bitnumDestRegs && i < bitnumPC+bitnumDestRegs+bitnumSrcRegs && this->numSrcRegs() != 0) {
+            int injectTarget = ((i-bitnumPC-bitnumDestRegs)/11) % (this->numSrcRegs());
+            if(this->srcRegIdx(injectTarget) < 16) {
+                this->cpu->changeSrc = true;
+                this->cpu->oldSrcReg = this->srcRegIdx(injectTarget);
+                this->cpu->oldSrcIdx = injectTarget;
+                this->cpu->oldPC = this->instAddr();
+                this->cpu->oldMicroPC = this->microPC();
+                this->cpu->oldInst = this->staticInst->disassemble(this->instAddr());
+                int newSrcReg = this->srcRegIdx(injectTarget) ^ (1UL << ((i-bitnumPC-bitnumDestRegs)%4));
+                DPRINTF(FI,  "%llu & %d (Architectural Source Register) : %d to %d\n", curTick(), this->seqNum, this->srcRegIdx(injectTarget), newSrcReg);
+                this->setSrcRegIdx(injectTarget, newSrcReg);
+                return true;
+            }
+        }
+        else if(i >= bitnumPC+bitnumDestRegs+bitnumSrcRegs && i < bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum) {
+            int newSeqNum = this->seqNum ^ (1UL << (i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs)));
+            DPRINTF(FI,  "%llu & %d (Sequence Number): %d to %d\n", curTick(), this->seqNum, this->seqNum, newSeqNum);
+            this->seqNum = newSeqNum;
+            return true;
+        }
+        else if(i >= bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum && i < bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC) {
+            Addr newPC = this->predInstAddr() ^ (1UL << (i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum)));
+            DPRINTF(FI,  "%llu & %d (Predicted Next PC): %#x to %#x\n", curTick(), this->seqNum, this->predInstAddr(), newPC);
+            this->predPC.set(newPC);
+            return true;
+        }
+         else if(i >= bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC && i < bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass) {
+            this->setOpClass(i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC));
+            DPRINTF(FI,  "%llu & %d (OpClass)\n", curTick(), this->seqNum);
+            return true;
+        }
+        
+        else if(i >= bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass && i < bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags) {
+            DPRINTF(FI,  "%llu & %d (Flags)\n", curTick(), this->seqNum);
+            this->flipFlags(i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass));
+            return true;
+        }
+        else if(i >= bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags && i < bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags+bitnumPDestRegs && this->numDestRegs() != 0 ) {
+            int injectTarget = ((i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags)/8) % (this->numDestRegs()));
+            if(this->destRegIdx(injectTarget) < 16) {
+                int newDestReg = (this->_destRegIdx[injectTarget]) ^ (1UL << ((i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags))%8));
+                DPRINTF(FI,  "%llu & %d (Physical Destination Register): %d to %d\n", curTick(), this->seqNum, this->_destRegIdx[injectTarget], newDestReg);
+                this->_destRegIdx[injectTarget] = newDestReg;
+                return true;
+            }
+        }
+        else if(i >= bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags+bitnumPDestRegs && i < bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags+bitnumPDestRegs+bitnumPSrcRegs && this->numSrcRegs() != 0 ) {
+            int injectTarget = ((i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags+bitnumPDestRegs)/8) % (this->numSrcRegs()));
+            if(this->srcRegIdx(injectTarget) < 16) {
+                int newSrcReg = (this->_srcRegIdx[injectTarget]) ^ (1UL << ((i-(bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags+bitnumPDestRegs))%8));
+                DPRINTF(FI,  "%llu & %d (Physical Source Register): %d to %d\n", curTick(), this->seqNum, this->_srcRegIdx[injectTarget], newSrcReg);
+                this->_srcRegIdx[injectTarget] = newSrcReg;
+                return true;
+            }
+        }
+        return false;
+    }
+    
 #ifdef ISA_HAS_CC_REGS
     typedef TheISA::CCReg   CCReg;
 #endif
@@ -130,7 +226,7 @@ class BaseO3DynInst : public BaseDynInst<Impl>
   public:
 #if TRACING_ON
     /** Tick records used for the pipeline activity viewer. */
-    Tick fetchTick;	     // instruction fetch is completed.
+    Tick fetchTick;         // instruction fetch is completed.
     int32_t decodeTick;  // instruction enters decode phase
     int32_t renameTick;  // instruction enters rename phase
     int32_t dispatchTick;
@@ -261,7 +357,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnRead(ST_REGFILE, RF_REGISTER, this->_srcRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
         return this->cpu->readIntReg(this->_srcRegIdx[idx]);
     }
 
@@ -269,7 +366,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnRead(ST_REGFILE, RF_REGISTER, this->_srcRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
         return this->cpu->readFloatReg(this->_srcRegIdx[idx]);
     }
 
@@ -277,7 +375,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnRead(ST_REGFILE, RF_REGISTER, this->_srcRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
         return this->cpu->readFloatRegBits(this->_srcRegIdx[idx]);
     }
 
@@ -285,7 +384,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnRead(ST_REGFILE, RF_REGISTER, this->_srcRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnRead(this->_srcRegIdx[idx], this->seqNum);
         return this->cpu->readCCReg(this->_srcRegIdx[idx]);
     }
 
@@ -296,7 +396,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnWrite(ST_REGFILE, RF_REGISTER, this->_destRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
         this->cpu->setIntReg(this->_destRegIdx[idx], val);
         BaseDynInst<Impl>::setIntRegOperand(si, idx, val);
     }
@@ -305,7 +406,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnWrite(ST_REGFILE, RF_REGISTER, this->_destRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
         this->cpu->setFloatReg(this->_destRegIdx[idx], val);
         BaseDynInst<Impl>::setFloatRegOperand(si, idx, val);
     }
@@ -315,7 +417,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnWrite(ST_REGFILE, RF_REGISTER, this->_destRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
         this->cpu->setFloatRegBits(this->_destRegIdx[idx], val);
         BaseDynInst<Impl>::setFloatRegOperandBits(si, idx, val);
     }
@@ -324,7 +427,8 @@ class BaseO3DynInst : public BaseDynInst<Impl>
     {
         //VUL_TRACKER REGISTER_FILE
         //this->vulT.vulOnWrite(ST_REGFILE, RF_REGISTER, this->_destRegIdx[idx]);
-        this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
+        if(this->cpu->rfVulEnable)
+            this->cpu->regVulCalc.vulOnWrite(this->_destRegIdx[idx], this->seqNum);
         this->cpu->setCCReg(this->_destRegIdx[idx], val);
         BaseDynInst<Impl>::setCCRegOperand(si, idx, val);
     }

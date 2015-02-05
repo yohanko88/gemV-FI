@@ -457,7 +457,7 @@ BPredUnit::squash(const InstSeqNum &squashed_sn,
             DPRINTF(Branch, "Front sn %i != Squash sn %i\n",
                     pred_hist.front().seqNum, squashed_sn);
 
-            assert(pred_hist.front().seqNum == squashed_sn);
+            //assert(pred_hist.front().seqNum == squashed_sn);
         }
 
 

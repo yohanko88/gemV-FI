@@ -212,6 +212,9 @@ class DefaultFetch
 
     /** Sets pointer to time buffer used to communicate to the next stage. */
     void setFetchQueue(TimeBuffer<FetchStruct> *fq_ptr);
+	
+	//YOHAN
+    void flipFetchQueue(unsigned injectLoc);
 
     /** Initialize stage. */
     void startupStage();

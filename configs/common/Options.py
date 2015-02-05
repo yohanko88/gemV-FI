@@ -119,11 +119,15 @@ def addCommonOptions(parser):
                 choices = ["parity_block","parity_word","ecc_block","ecc_word","no_protection"],
                 help = "Cache protection model. Choose one of parity_block, parity_word\
                                                    ecc_block, ecc_word, no_protection")
+    parser.add_option("--fi_reg", type="int", default="1",
+                                help="display log for register")
+    parser.add_option("--vul_params", type="string",
+                help = "File specifying vulnerability enable options for each microarch component.")
 
     #YOHAN: Fault injection on 
     parser.add_option("--injectArch", type="choice", default="NO",
-                choices = ["ROB", "RF", "NO"],
-                help = "Which architecture do you want to inject faults? (ROB, RF, etc.) - Default: No injection")
+                choices = ["ROB", "RF", "FetchQueue", "DecodeQueue", "NO"],
+                help = "Which architecture do you want to inject faults? (FetchQueue and etc.) - Default: No injection")
     parser.add_option("--injectTime", type="int", default="0",
                 help = "Time to inject fault.")
     parser.add_option("--injectLoc", type="int", default="0",

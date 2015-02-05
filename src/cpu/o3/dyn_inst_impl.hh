@@ -120,6 +120,18 @@ BaseO3DynInst<Impl>::initVars()
     this->_readySrcRegIdx.reset();
 
     _numDestMiscRegs = 0;
+    
+    //YOHAN
+    bitnumPC = 32;
+    bitnumDestRegs = 88;
+    bitnumSrcRegs = 297;
+    bitnumSeqNum = 32;
+    bitnumPredPC = 32;
+    bitnumOpClass = 32;
+    bitnumFlags = 73;
+	bitnumPSrcRegs = 64;
+	bitnumPDestRegs = 216;
+    bitnumDynInst = bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags+bitnumPSrcRegs+bitnumPDestRegs;
 
 #if TRACING_ON
     // Value -1 indicates that particular phase

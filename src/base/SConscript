@@ -86,6 +86,7 @@ Source('vulnerability/vul_histbuf.cc')
 Source('vulnerability/vul_tracker.cc')
 Source('vulnerability/vul_structs.cc')
 Source('vulnerability/vul_access.cc')
+Source('vulnerability/vul_pipeline.cc')
 #Source('vulnerability/vulnerabilityContainer.cc')
 #Source('vulnerability/vulnerability_tracker.cc')
 
@@ -104,6 +105,7 @@ DebugFlag('GDBWrite', "Writes to the remote address space")
 DebugFlag('SQL', "SQL queries sent to the server")
 DebugFlag('StatEvents', "Statistics event tracking")
 DebugFlag('VulTracker', "Vulnerability tracker tracking")
+DebugFlag('VulTrackerROB', "Vulnerability tracker tracking")
 
 CompoundFlag('GDBAll',
     [ 'GDBMisc', 'GDBAcc', 'GDBRead', 'GDBWrite', 'GDBSend', 'GDBRecv',

@@ -74,9 +74,6 @@
 
 #include "base/vulnerability/vul_tracker.hh"        //VUL_TRACKER
 
-//#include "debug/vulRTL.hh"             //VUL_PIPELINE
-//#include "base/vulnerability/vulnerabilityParams.hh"            //VUL_PIPELINE
-
 using namespace std;
 
 template<class Impl>
@@ -1095,6 +1092,21 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
     instruction->setASID(tid);
 
     instruction->setThreadState(cpu->thread[tid]);
+    
+    //YOHAN
+    //if(thisPC.instAddr() == cpu->oldPC && thisPC.microPC() == cpu->oldMicroPC) {
+	if(cpu->oldInst == staticInst->disassemble(thisPC.instAddr())) {
+        if (cpu->changeDest) {
+            DPRINTF(Fetch, "Restore is called for detination register\n");
+            instruction->setDestRegIdx(cpu->oldDestIdx, cpu->oldDestReg);
+            //cpu->changeDest = false;
+        }
+        else if (cpu->changeSrc) {
+            DPRINTF(Fetch, "Restore is called for source reigster\n");
+            instruction->setSrcRegIdx(cpu->oldSrcIdx, cpu->oldSrcReg);
+            //cpu->changeSrc = false;
+        }
+    }
 
     DPRINTF(Fetch, "[tid:%i]: Instruction PC %#x (%d) created "
             "[sn:%lli].\n", tid, thisPC.instAddr(),
@@ -1121,6 +1133,10 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
     // that heads to decode.
     assert(numInst < fetchWidth);
     toDecode->insts[toDecode->size++] = instruction;
+
+    //VUL_TRACKER Writing to Fetch Queue
+    if(this->cpu->pipeVulEnable)
+        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, P_SEQNUM, instruction->seqNum);
 
     // Keep track of if we can take an interrupt at this boundary
     delayedCommit[tid] = instruction->isDelayedCommit();
@@ -1292,7 +1308,6 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (!(curMacroop || inRom)) {
                 if (decoder[tid]->instReady()) {
                     staticInst = decoder[tid]->decode(thisPC);
-
                     // Increment stat of fetched instructions.
                     ++fetchedInsts;
 
@@ -1327,27 +1342,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
             numInst++;
             
-            //VUL_PIPELINE start
             // VUL_TRACKER
-            /*
-            instruction->vulT.trackAccess(INSERTFIELD, FETCHQUEUE, INST_OPCODE);
-            instruction->vulT.trackAccess(INSERTFIELD, FETCHQUEUE, INST_PC);
-            instruction->vulT.trackAccess(INSERTFIELD, FETCHQUEUE, INST_TID);
-            instruction->vulT.trackAccess(INSERTFIELD, FETCHQUEUE, INST_SEQNUM);
-            instruction->vulT.trackAccess(INSERTFIELD, FETCHQUEUE, INST_PREDPC);
-            instruction->vulT.trackAccess(INSERTFIELD, FETCHQUEUE, INST_FLAGS);
-            instruction->vulT.trackAccess(INSERTFIELD, FETCHQUEUE, INST_FAULT);
-            */
-            /*
-            for(int i = 0; i < instruction->numDestRegs(); ++i) {
-                instruction->vulT.trackRegAccess(INSERTFIELD, FETCHQUEUE, INST_DESTREGSIDX, i);
-            }
-
-            for(int i = 0; i < instruction->numSrcRegs(); ++i) {
-                instruction->vulT.trackRegAccess(INSERTFIELD, FETCHQUEUE, INST_SRCREGSIDX, i);
-            }
-            */
-            //VUL_PIPELINE end
 
 #if TRACING_ON
             if (DTRACE(O3PipeView)) {
