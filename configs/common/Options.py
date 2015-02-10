@@ -124,9 +124,9 @@ def addCommonOptions(parser):
     parser.add_option("--vul_params", type="string",
                 help = "File specifying vulnerability enable options for each microarch component.")
 
-    #YOHAN: Fault injection on 
+    #YOHAN: Fault injection options
     parser.add_option("--injectArch", type="choice", default="NO",
-                choices = ["ROB", "RF", "FetchQueue", "DecodeQueue", "NO"],
+                choices = ["ROB", "RF", "FetchQueue", "DecodeQueue", "RenameQueue", "RenameMap", "HistoryBuffer", "LSQ", "IQ", "IEWQ", "NO"],
                 help = "Which architecture do you want to inject faults? (FetchQueue and etc.) - Default: No injection")
     parser.add_option("--injectTime", type="int", default="0",
                 help = "Time to inject fault.")

@@ -388,23 +388,29 @@ def run(options, root, testsys, cpu_class):
             if options.vul_analysis == "yes":
                 switch_cpus[i].vul_analysis = 1
 				
-            #YOHAN: Option to inject fault
+            #YOHAN: Add parameter for fault injection
+            switch_cpus[i].injectTime = options.injectTime
+            switch_cpus[i].injectLoc = options.injectLoc
             if options.injectArch == "ROB":
                 switch_cpus[i].injectFaultROB = 1
-                switch_cpus[i].injectTime = options.injectTime
-                switch_cpus[i].injectLoc = options.injectLoc
             if options.injectArch == "RF":
                 switch_cpus[i].injectFaultRF = 1
-                switch_cpus[i].injectTime = options.injectTime
-                switch_cpus[i].injectLoc = options.injectLoc
             if options.injectArch == "FetchQueue":
                 switch_cpus[i].injectFaultFQ = 1
-                switch_cpus[i].injectTime = options.injectTime
-                switch_cpus[i].injectLoc = options.injectLoc
             if options.injectArch == "DecodeQueue":
                 switch_cpus[i].injectFaultDQ = 1
-                switch_cpus[i].injectTime = options.injectTime
-                switch_cpus[i].injectLoc = options.injectLoc
+            if options.injectArch == "RenameQueue":
+                switch_cpus[i].injectFaultRQ = 1
+            if options.injectArch == "RenameMap":
+                switch_cpus[i].injectFaultRM = 1
+            if options.injectArch == "HistoryBuffer":
+                switch_cpus[i].injectFaultHB = 1
+            if options.injectArch == "LSQ":
+                switch_cpus[i].injectFaultLSQ = 1
+            if options.injectArch == "IQ":
+                switch_cpus[i].injectFaultIQ = 1
+            if options.injectArch == "IEWQ":
+                switch_cpus[i].injectFaultIEWQ = 1
 
         testsys.switch_cpus = switch_cpus
         testsys.switch_cpus_1 = switch_cpus_1

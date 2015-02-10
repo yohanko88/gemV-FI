@@ -255,22 +255,28 @@ for i in xrange(np):
                             system.cpu[i].rename_vul_enable = 1;
 							
     #YOHAN: Add parameter for fault injection
+    system.cpu[i].injectTime = options.injectTime
+    system.cpu[i].injectLoc = options.injectLoc
     if options.injectArch == "ROB":
         system.cpu[i].injectFaultROB = 1;
-        system.cpu[i].injectTime = options.injectTime
-        system.cpu[i].injectLoc = options.injectLoc
     if options.injectArch == "RF":
         system.cpu[i].injectFaultRF = 1;
-        system.cpu[i].injectTime = options.injectTime
-        system.cpu[i].injectLoc = options.injectLoc
     if options.injectArch == "FetchQueue":
         system.cpu[i].injectFaultFQ = 1;
-        system.cpu[i].injectTime = options.injectTime
-        system.cpu[i].injectLoc = options.injectLoc
     if options.injectArch == "DecodeQueue":
         system.cpu[i].injectFaultDQ = 1;
-        system.cpu[i].injectTime = options.injectTime
-        system.cpu[i].injectLoc = options.injectLoc
+    if options.injectArch == "RenameQueue":
+        system.cpu[i].injectFaultRQ = 1;
+    if options.injectArch == "RenameMap":
+        system.cpu[i].injectFaultRM = 1;
+    if options.injectArch == "HistoryBuffer":
+        system.cpu[i].injectFaultHB = 1;
+    if options.injectArch == "LSQ":
+        system.cpu[i].injectFaultLSQ = 1;
+    if options.injectArch == "IQ":
+        system.cpu[i].injectFaultIQ = 1;
+    if options.injectArch == "IEWQ":
+        system.cpu[i].injectFaultIEWQ = 1;
 
     system.cpu[i].createThreads()
 
