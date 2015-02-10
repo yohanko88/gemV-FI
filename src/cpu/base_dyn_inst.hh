@@ -159,6 +159,18 @@ class BaseDynInst : public RefCounted
     /** The sequence number of the instruction. */
     InstSeqNum seqNum;
 
+    /** VUL_TRACKER The sequence number of the instruction. */
+    InstSeqNum seqNumROB;
+
+    /** VUL_TRACKER The sequence number of the instruction. */
+    InstSeqNum seqNumIQ;
+
+    /** VUL_TRACKER The sequence number of the instruction. */
+    InstSeqNum seqNumLSQ;
+
+    /** VUL_TRACKER The sequence number of the instruction. */
+    InstSeqNum seqNumIEWQ;
+
     /** The StaticInst used by this BaseDynInst. */
     StaticInstPtr staticInst;
 
@@ -177,6 +189,7 @@ class BaseDynInst : public RefCounted
     /** VUL_TRACKER */
     VulTracker vulT;
 
+
   protected:
     /** The result of the instruction; assumes an instruction can have many
      *  destination registers.
@@ -185,6 +198,9 @@ class BaseDynInst : public RefCounted
 
     /** PC state for this instruction. */
     TheISA::PCState pc;
+
+    /** VUL_TRACKER PC state for this instruction. */
+    TheISA::PCState pcROB;
 
     /* An amalgamation of a lot of boolean values into one */
     std::bitset<MaxFlags> instFlags;
@@ -240,6 +256,17 @@ class BaseDynInst : public RefCounted
     /** Store queue index. */
     int16_t sqIdx;
 
+    /** VUL_TRACKER Who is accessing? */
+    enum Accessor {
+        OTHERS,
+        INST_Q,
+        LS_Q,
+        ROB
+    };
+
+    /** VUL_TRACKER Who is accessing? */
+    Accessor accessor;
+
 
     /////////////////////// TLB Miss //////////////////////
     /**
@@ -271,10 +298,18 @@ class BaseDynInst : public RefCounted
      */
     PhysRegIndex _destRegIdx[TheISA::MaxInstDestRegs];
 
+    //VUL_TRACKER
+    PhysRegIndex _destRegIdxIQ[TheISA::MaxInstDestRegs];
+    PhysRegIndex _destRegIdxLSQ[TheISA::MaxInstDestRegs];
+
     /** Physical register index of the source registers of this
      *  instruction.
      */
     PhysRegIndex _srcRegIdx[TheISA::MaxInstSrcRegs];
+
+    //VUL_TRACKER
+    PhysRegIndex _srcRegIdxIQ[TheISA::MaxInstSrcRegs];
+    PhysRegIndex _srcRegIdxLSQ[TheISA::MaxInstSrcRegs];
 
     /** Physical register index of the previous producers of the
      *  architected destinations.
@@ -373,7 +408,7 @@ class BaseDynInst : public RefCounted
     PhysRegIndex renamedDestRegIdx(int idx)
     {
         //VUL_TRACKER
-        vulT.vulOnRead(INST_RNMDESTREGSIDX, this->seqNum, idx);
+        //vulT.vulOnRead(INST_RNMDESTREGSIDX, this->seqNum, idx);
         return _destRegIdx[idx];
     }
 
@@ -382,7 +417,7 @@ class BaseDynInst : public RefCounted
     {
         assert(TheISA::MaxInstSrcRegs > idx);
         //VUL_TRACKER
-        vulT.vulOnRead(INST_RNMSRCREGSIDX, this->seqNum, idx);
+        //vulT.vulOnRead(INST_RNMSRCREGSIDX, this->seqNum, idx);
         return _srcRegIdx[idx];
     }
 
@@ -391,7 +426,7 @@ class BaseDynInst : public RefCounted
      */
     TheISA::RegIndex flattenedDestRegIdx(int idx)
     {
-        vulT.vulOnRead(INST_FLTDESTREGSIDX, this->seqNum, idx);
+        //vulT.vulOnRead(INST_FLTDESTREGSIDX, this->seqNum, idx);
         return _flatDestRegIdx[idx];
     }
 
@@ -400,7 +435,7 @@ class BaseDynInst : public RefCounted
      */
     PhysRegIndex prevDestRegIdx(int idx)
     {
-        vulT.vulOnRead(INST_PRVDESTREGSIDX, this->seqNum, idx);
+        //vulT.vulOnRead(INST_PRVDESTREGSIDX, this->seqNum, idx);
         return _prevDestRegIdx[idx];
     }
 
@@ -412,10 +447,12 @@ class BaseDynInst : public RefCounted
                        PhysRegIndex previous_rename)
     {
         _destRegIdx[idx] = renamed_dest;
-        _prevDestRegIdx[idx] = previous_rename;
+        _destRegIdxIQ[idx] = renamed_dest;                  //VUL_RENAME
+        _destRegIdxLSQ[idx] = renamed_dest;                 //VUL_RENAME
+        _prevDestRegIdx[idx] = previous_rename;                 
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_RNMDESTREGSIDX, this->seqNum, idx);
-        vulT.vulOnWrite(INST_PRVDESTREGSIDX, this->seqNum, idx);
+        //vulT.vulOnWrite(INST_RNMDESTREGSIDX, this->seqNum, idx);
+        //vulT.vulOnWrite(INST_PRVDESTREGSIDX, this->seqNum, idx);
     }
 
     /** Renames a source logical register to the physical register which
@@ -425,8 +462,10 @@ class BaseDynInst : public RefCounted
     void renameSrcReg(int idx, PhysRegIndex renamed_src)
     {
         _srcRegIdx[idx] = renamed_src;
+        _srcRegIdxIQ[idx] = renamed_src;                    //VUL_RENAME
+        _srcRegIdxLSQ[idx] = renamed_src;                   //VUL_RENAME
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_RNMSRCREGSIDX, this->seqNum, idx);
+        //vulT.vulOnWrite(INST_RNMSRCREGSIDX, this->seqNum, idx);
     }
 
     /** Flattens a destination architectural register index into a logical
@@ -436,7 +475,7 @@ class BaseDynInst : public RefCounted
     {
         _flatDestRegIdx[idx] = flattened_dest;
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_FLTDESTREGSIDX, this->seqNum, idx);
+        //vulT.vulOnWrite(INST_FLTDESTREGSIDX, this->seqNum, idx);
     }
     /** BaseDynInst constructor given a binary instruction.
      *  @param staticInst A StaticInstPtr to the underlying instruction.
@@ -491,13 +530,13 @@ class BaseDynInst : public RefCounted
     void setPredTarg(const TheISA::PCState &_predPC)
     {
         //VUL_TRACKER
-        vulT.vulOnWrite(INST_PREDPC, this->seqNum);
+        //vulT.vulOnWrite(INST_PREDPC, this->seqNum);
         predPC = _predPC;
     }
 
     const TheISA::PCState &readPredTarg() { 
         //VUL_TRACKER
-        vulT.vulOnRead(INST_PREDPC, this->seqNum);
+        //vulT.vulOnRead(INST_PREDPC, this->seqNum);
         return predPC; }
 
     /** Returns the predicted PC immediately after the branch. */
@@ -601,16 +640,7 @@ class BaseDynInst : public RefCounted
     /** Returns the opclass of this instruction. */
     OpClass opClass() const { return staticInst->opClass(); }
     
-    /** Set the opclass of this instruction. */ //YOHAN
-    void setOpClass(int i) {
-        int x = staticInst->opClass();
-        x = x+i;
-        if(x>33)
-            x = x-33;
-        staticInst->setOpClass(x);
-    }
-	    
-    /// Flip the flag bits //YOHAN
+    //YOHAN: Flip the flag bits
     void flipFlags(int i) {
         if(i<MaxFlags) { //12
             if(instFlags[i])
@@ -627,10 +657,6 @@ class BaseDynInst : public RefCounted
         else
             return staticInst->flipFlags(i-MaxFlags-NumStatus); //40
     }
-    
-    int getMRI() const { return staticInst-> getMRI(); }
-    int getMaxInstSrcRegs() const { return staticInst->MaxInstSrcRegs; }
-    int getMaxInstDestRegs() const { return staticInst->MaxInstDestRegs; }
 
     /** Returns the branch target address. */
     TheISA::PCState branchTarget() const
@@ -649,16 +675,17 @@ class BaseDynInst : public RefCounted
 
     /** Returns the logical register index of the i'th destination register. */
     RegIndex destRegIdx(int i) const { return staticInst->destRegIdx(i); }
+
+    /** Returns the logical register index of the i'th source register. */
+    RegIndex srcRegIdx(int i) const { return staticInst->srcRegIdx(i); }
     
-    /** Set the logical register index of the i'th destination register. */ //YOHAN
+    //YOHAN: Set the logical register index of the i'th destination register.
     void setDestRegIdx(int i, int j) {
         RegIndex regID = j;
         staticInst->setDestRegIdx(i, regID);
     }
-    /** Returns the logical register index of the i'th source register. */
-    RegIndex srcRegIdx(int i) const { return staticInst->srcRegIdx(i); }
     
-    /** Set the logical register index of the i'th source register. */ //YOHAN
+    //YOHAN: Set the logical register index of the i'th source register.
     void setSrcRegIdx(int i, int j) {
         RegIndex regID = j;
         staticInst->setSrcRegIdx(i, regID);
@@ -863,21 +890,49 @@ class BaseDynInst : public RefCounted
     /** Read the PC state of this instruction. */
     const TheISA::PCState pcState() { 
         //VUL_TRACKER
-        vulT.vulOnRead(INST_PC, this->seqNum);
+        if(this->accessor == ROB)
+            return pcROB;
+
         return pc; 
     }
 
     /** Set the PC state of this instruction. */
-    const void pcState(const TheISA::PCState &val) { pc = val; }
+    const void pcState(const TheISA::PCState &val) { 
+        pc = val;
+        pcROB = val;
+    }
+    
+    //YOHAN: Set the PC state of ROB of this instruction.
+    const void pcRobState(const TheISA::PCState &val) { 
+        pcROB = val;
+    }
 
     /** Read the PC of this instruction. */
-    const Addr instAddr() const { return pc.instAddr(); }
+    const Addr instAddr() const { 
+        //VUL_TRACKER
+        if(this->accessor == ROB)
+           return pcROB.instAddr();
+
+        return pc.instAddr(); 
+    }
 
     /** Read the PC of the next instruction. */
-    const Addr nextInstAddr() const { return pc.nextInstAddr(); }
+    const Addr nextInstAddr() const { 
+        //VUL_TRACKER
+        if(this->accessor == ROB)
+            return pcROB.nextInstAddr();
+
+        return pc.nextInstAddr();
+    }
 
     /**Read the micro PC of this instruction. */
-    const Addr microPC() const { return pc.microPC(); }
+    const Addr microPC() const { 
+        //VUL_TRACKER
+        if(this->accessor == ROB)
+            return pcROB.microPC();
+        
+        return pc.microPC(); 
+    }
 
     bool readPredicate()
     {

@@ -260,6 +260,15 @@ LSQ<Impl>::tick()
     }
 }
 
+//YOHAN
+template<class Impl>
+bool
+LSQ<Impl>::flipLSQ(unsigned injectLoc, ThreadID tid)
+{
+    bool flipLSQ = thread[tid].flipLSQ(injectLoc);
+	return flipLSQ;
+}
+
 template<class Impl>
 void
 LSQ<Impl>::insertLoad(DynInstPtr &load_inst)

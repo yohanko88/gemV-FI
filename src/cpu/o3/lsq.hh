@@ -76,6 +76,9 @@ class LSQ {
 
     /** Returns the name of the LSQ. */
     std::string name() const;
+    
+    //YOHAN:
+    bool flipLSQ(unsigned injectLoc, ThreadID tid);
 
     /** Registers statistics of each LSQ unit. */
     void regStats();

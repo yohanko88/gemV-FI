@@ -69,7 +69,12 @@ BaseDynInst<Impl>::BaseDynInst(StaticInstPtr _staticInst,
   : staticInst(_staticInst), cpu(cpu), traceData(NULL), macroop(_macroop)
 {
     seqNum = seq_num;
-
+    seqNumROB = seq_num;
+    seqNumIQ = seq_num;
+    seqNumLSQ = seq_num;
+    seqNumIEWQ = seq_num;
+    //VUL_TRACKER
+    pcROB = _pc;
     pc = _pc;
     predPC = _predPC;
 

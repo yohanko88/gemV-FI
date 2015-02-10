@@ -56,13 +56,13 @@
 #include "debug/Rename.hh"
 #include "debug/O3PipeView.hh"
 #include "params/DerivO3CPU.hh"
+#include "debug/FI.hh" //YOHAN: Debug flag for fault injection
 
 using namespace std;
 
 template <class Impl>
 DefaultRename<Impl>::DefaultRename(O3CPU *_cpu, DerivO3CPUParams *params)
-    : histbufVulCalc(params->numThreads),                               //VUL_RENAME
-      cpu(_cpu),
+    : cpu(_cpu),
       iewToRenameDelay(params->iewToRenameDelay),
       decodeToRenameDelay(params->decodeToRenameDelay),
       commitToRenameDelay(params->commitToRenameDelay),
@@ -174,16 +174,6 @@ DefaultRename<Impl>::regStats()
         .name(name() + ".fp_rename_lookups")
         .desc("Number of floating rename lookups")
         .prereq(fpRenameLookups);
-    //renameMapVul                                                            //VUL_RENAME
-    //    .name(name() + ".map.vulnerability")
-    //    .desc("Vulnerability of the Rename Map in bit-ticks")
-    //    .precision(0);
-    //for(unsigned i = 0; i < numThreads; ++i)    
-    //    renameMapVul += renameMap[i]->renameMapVul;
-              
-    //histbufVul                                                              //VUL_RENAME
-    //    .name(name() + ".histbuf.vulnerability")
-    //    .desc("Vulnerability of the History Buffer in bit-ticks");
 }
 
 template <class Impl>
@@ -686,8 +676,14 @@ DefaultRename<Impl>::renameInsts(ThreadID tid)
         --insts_available;
 
         //VUL_TRACKER Writing to Rename Queue
-        if(this->cpu->pipeVulEnable)
-            this->cpu->pipeVulT.vulOnWrite(P_RENAMEQ, P_SEQNUM, inst->seqNum);
+        if(this->cpu->pipeVulEnable) {
+            this->cpu->pipeVulT.vulOnWrite(P_RENAMEQ, INST_OPCODE, inst->seqNum);
+            this->cpu->pipeVulT.vulOnWrite(P_RENAMEQ, INST_PC, inst->seqNum);
+            this->cpu->pipeVulT.vulOnWrite(P_RENAMEQ, INST_SEQNUM, inst->seqNum);
+            this->cpu->pipeVulT.vulOnWrite(P_RENAMEQ, INST_FLAGS, inst->seqNum);
+            this->cpu->pipeVulT.vulOnWrite(P_RENAMEQ, INST_PHYSRCREGSIDX, inst->seqNum);
+            this->cpu->pipeVulT.vulOnWrite(P_RENAMEQ, INST_PHYDESTREGSIDX, inst->seqNum);
+        }
     }
 
     instsInProgress[tid] += renamed_insts;
@@ -750,27 +746,20 @@ void
 DefaultRename<Impl>::sortInsts()
 {
     int insts_from_decode = fromDecode->size;
-    
+
     for (int i = 0; i < insts_from_decode; ++i) {
-        //YOHAN
-         bool injectDQ = false;
-        if(cpu->injectTime <= curTick() && cpu->injectFaultDQ == 1) {
-            if(cpu->injectLoc >= fromDecode->insts[i]->bitnumDynInst) {
-                cpu->injectLoc = (cpu->injectLoc - (fromDecode->insts[i]->bitnumDynInst));
-            }
-            else {
-                injectDQ = fromDecode->insts[i]->flipDynInst(cpu->injectLoc);
-                if(injectDQ==true)
-                    cpu->injectFaultDQ = 0;
-            }
-        }
-        
         DynInstPtr inst = fromDecode->insts[i];
         insts[inst->threadNumber].push_back(inst);
 
         //VUL_TRACKER Reading from Decode Queue
-        if(this->cpu->pipeVulEnable)
-            this->cpu->pipeVulT.vulOnRead(P_DECODEQ, P_SEQNUM, fromDecode->insts[i]->seqNum);
+        if(this->cpu->pipeVulEnable) {
+            this->cpu->pipeVulT.vulOnRead(P_DECODEQ, INST_OPCODE, fromDecode->insts[i]->seqNum);
+            this->cpu->pipeVulT.vulOnRead(P_DECODEQ, INST_PC, fromDecode->insts[i]->seqNum);
+            this->cpu->pipeVulT.vulOnRead(P_DECODEQ, INST_SEQNUM, fromDecode->insts[i]->seqNum);
+            this->cpu->pipeVulT.vulOnRead(P_DECODEQ, INST_FLAGS, fromDecode->insts[i]->seqNum);
+            this->cpu->pipeVulT.vulOnRead(P_DECODEQ, INST_ARCHSRCREGSIDX, fromDecode->insts[i]->seqNum);
+            this->cpu->pipeVulT.vulOnRead(P_DECODEQ, INST_ARCHDESTREGSIDX, fromDecode->insts[i]->seqNum);
+        }
 
 #if TRACING_ON
         if (DTRACE(O3PipeView)) {
@@ -923,18 +912,16 @@ DefaultRename<Impl>::doSquash(const InstSeqNum &squashed_seq_num, ThreadID tid)
             // Tell the rename map to set the architected register to the
             // previous physical register that it was renamed to.
             renameMap[tid]->setEntry(hb_it->archReg, hb_it->prevPhysReg);
-            
             //VUL_TRACKER Write to Rename map
-            if(this->cpu->renameVulEnable)
-                this->cpu->renameVulT.vulOnWrite(hb_it->archReg, 0, tid);
-
+            if(this->cpu->renameVulEnable) {
+                this->cpu->renameVulT.vulOnReadHB(hb_it->archReg, hb_it->instSeqNum, tid);
+                this->cpu->renameVulT.vulOnSquash(hb_it->instSeqNum , tid);
+                this->cpu->renameVulT.vulOnWrite(hb_it->archReg, squashed_seq_num, tid);
+            }
+            
             // Put the renamed physical register back on the free list.
             freeList->addReg(hb_it->newPhysReg);
         }
-       /* 
-        if(this->cpu->renameVulEnable)
-            histbufVul += histbufVulCalc.vulOnRead(hb_it->instSeqNum, tid);                   //VUL_RENAME
-        */
         historyBuffer[tid].erase(hb_it++);
 
         ++renameUndoneMaps;
@@ -983,10 +970,10 @@ DefaultRename<Impl>::removeFromHistory(InstSeqNum inst_seq_num, ThreadID tid)
         }
 
         ++renameCommittedMaps;
-       /* 
+
         if(this->cpu->renameVulEnable)
-            histbufVulCalc.vulOnRemove(hb_it->instSeqNum, tid);                           //VUL_RENAME
-        */
+            this->cpu->renameVulT.vulOnRemove(hb_it->instSeqNum, tid);                           //VUL_RENAME
+
         historyBuffer[tid].erase(hb_it--);
     }
 }
@@ -1099,6 +1086,7 @@ DefaultRename<Impl>::renameDestRegs(DynInstPtr &inst, ThreadID tid)
             if(this->cpu->renameVulEnable) {
                 this->cpu->renameVulT.vulOnRead((int)flat_rel_dest_reg, inst->seqNum, tid);
                 this->cpu->renameVulT.vulOnWrite((int)flat_rel_dest_reg, inst->seqNum, tid);
+                this->cpu->renameVulT.vulOnWriteHB((int)flat_rel_dest_reg, inst->seqNum, tid);
             }
 
             break;
@@ -1114,6 +1102,8 @@ DefaultRename<Impl>::renameDestRegs(DynInstPtr &inst, ThreadID tid)
                             , inst->seqNum, tid);
                 this->cpu->renameVulT.vulOnWrite((int)(flat_rel_dest_reg + TheISA::NumIntRegs)
                             , inst->seqNum, tid);
+                this->cpu->renameVulT.vulOnWriteHB((int)(flat_rel_dest_reg + TheISA::NumIntRegs)
+                            , inst->seqNum, tid);
             }
 
             break;
@@ -1127,6 +1117,7 @@ DefaultRename<Impl>::renameDestRegs(DynInstPtr &inst, ThreadID tid)
             if(this->cpu->renameVulEnable) {
                 this->cpu->renameVulT.vulOnRead((int)(flat_rel_dest_reg + TheISA::NumIntRegs + TheISA::NumFloatRegs), inst->seqNum, tid);
                 this->cpu->renameVulT.vulOnWrite((int)(flat_rel_dest_reg + TheISA::NumIntRegs + TheISA::NumFloatRegs), inst->seqNum, tid);
+                this->cpu->renameVulT.vulOnWriteHB((int)(flat_rel_dest_reg + TheISA::NumIntRegs + TheISA::NumFloatRegs), inst->seqNum, tid);
             }
 
             break;
@@ -1155,10 +1146,6 @@ DefaultRename<Impl>::renameDestRegs(DynInstPtr &inst, ThreadID tid)
         RenameHistory hb_entry(inst->seqNum, flat_uni_dest_reg,
                                rename_result.first,
                                rename_result.second);
-       /* 
-        if(this->cpu->renameVulEnable)
-            histbufVulCalc.vulOnWrite(inst->seqNum, tid);                            //VUL_RENAME
-        */
         historyBuffer[tid].push_front(hb_entry);
 
         DPRINTF(Rename, "[tid:%u]: Adding instruction to history buffer "
@@ -1453,6 +1440,66 @@ DefaultRename<Impl>::incrFullStat(const FullSource &source)
         panic("Rename full stall stat should be incremented for a reason!");
         break;
     }
+}
+
+//YOHAN: Flip a single bit in rename history buffer
+template <class Impl>
+bool
+DefaultRename<Impl>::flipHistoryBuffer(unsigned injectLoc)
+{
+    typename std::list<RenameHistory>::iterator buf_it;
+    int bitSeqNum = 32;
+    int bitArchReg = 5;
+    int bitNewPhysReg = 8;
+    int bitPrevPhysReg = 8;
+	int bitTotal = bitSeqNum + bitArchReg + bitNewPhysReg + bitPrevPhysReg;
+
+    for (ThreadID tid = 0; tid < numThreads; tid++) {
+        buf_it = historyBuffer[tid].begin();
+        while (buf_it != historyBuffer[tid].end()) {
+            if(injectLoc < bitSeqNum) {
+                int bit_flip = (*buf_it).instSeqNum ^ (1UL << (injectLoc%32));
+                DPRINTF(FI, "Bit Flip: History Buffer %d (Sequence Number): %d to %d\n", (*buf_it).archReg, (*buf_it).instSeqNum, bit_flip);
+                (*buf_it).instSeqNum = bit_flip;
+                return true;
+            }
+            else if (injectLoc >= bitSeqNum && injectLoc < bitSeqNum+bitArchReg) {
+                int newInjectLoc = injectLoc - bitSeqNum;
+                if((int)(*buf_it).archReg < TheISA::FP_Reg_Base) {
+                    int bit_flip = (*buf_it).archReg ^ (1UL << (newInjectLoc%5));
+                    DPRINTF(FI, "Bit Flip: History Buffer %d (Architectural Register): %d to %d\n", (*buf_it).archReg, (*buf_it).archReg, bit_flip);
+                    (*buf_it).archReg = bit_flip;
+                    return true;
+                }
+                else if ((int)(*buf_it).archReg >= TheISA::FP_Reg_Base && (int)(*buf_it).archReg < TheISA::CC_Reg_Base) {
+                    int newInjectLoc = injectLoc - bitSeqNum;
+                    int bit_flip = ((*buf_it).archReg - TheISA::FP_Reg_Base) ^ (1UL << (newInjectLoc%5));
+                    DPRINTF(FI, "Bit Flip: History Buffer %d (Architectural Register): %d to %d\n", (*buf_it).archReg - TheISA::FP_Reg_Base + TheISA::NumIntRegs, (*buf_it).archReg, bit_flip + TheISA::FP_Reg_Base);
+                    (*buf_it).archReg = bit_flip + TheISA::FP_Reg_Base;
+                    return true;
+                }
+                else
+                    return false;
+            }
+            else if (injectLoc >= bitSeqNum + bitArchReg && injectLoc < bitSeqNum + bitArchReg + bitNewPhysReg) {
+                int newInjectLoc = injectLoc - (bitSeqNum + bitArchReg);
+                int bit_flip = (*buf_it).newPhysReg ^ (1UL << (newInjectLoc%8));
+                DPRINTF(FI, "Bit Flip: History Buffer %d (NewPhysical Register): %d to %d\n", (*buf_it).archReg, (*buf_it).newPhysReg, bit_flip);
+                (*buf_it).newPhysReg = bit_flip;
+                return true;
+            }
+            else if (injectLoc >= bitSeqNum + bitArchReg + bitNewPhysReg && injectLoc < bitSeqNum + bitArchReg + bitNewPhysReg + bitPrevPhysReg) {
+                int newInjectLoc = injectLoc - (bitSeqNum + bitArchReg + bitNewPhysReg);
+                int bit_flip = (*buf_it).prevPhysReg ^ (1UL << (newInjectLoc%8));
+                DPRINTF(FI, "Bit Flip: History Buffer %d (PrevPhysical Register): %d to %d\n", (*buf_it).archReg, (*buf_it).prevPhysReg, bit_flip);
+                (*buf_it).prevPhysReg = bit_flip;
+                return true;
+            }
+			injectLoc = injectLoc - bitTotal;
+            buf_it++;
+        }
+    }
+    return false;
 }
 
 template <class Impl>

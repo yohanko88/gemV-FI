@@ -42,6 +42,7 @@
 #include "config/the_isa.hh"
 #include "cpu/o3/comm.hh"
 #include "debug/IEW.hh"
+#include "debug/FI.hh" //YOHAN: Debug flag for fault injection
 
 class UnifiedFreeList;
 
@@ -152,6 +153,24 @@ class PhysRegFile
     bool isCCPhysReg(PhysRegIndex reg_idx)
     {
         return (baseCCRegIndex <= reg_idx && reg_idx < totalNumRegs);
+    }
+    
+    //YOHAN: Flip a single bit in register file
+    bool flipRegFile (unsigned injectLoc)
+    {
+        if(injectLoc < numIntPhysRegs()*32) {
+            uint64_t bit_flip = readIntReg(injectLoc/32) ^ (1UL << (injectLoc%32));
+            DPRINTF(FI, "Bit Flip: Integer Physical Register %d: %#x to %#x\n", injectLoc/32, readIntReg(injectLoc/32), bit_flip);
+            setIntReg(injectLoc/32, bit_flip);
+            return true;
+        } else {
+            uint32_t temp = readFloatReg(injectLoc/32);
+            uint32_t bit_flip = temp ^ (1UL << (injectLoc%32));
+            DPRINTF(FI, "Bit Flip: Float Physical Register %d: %#x to %#x\n", injectLoc/32, readFloatReg(injectLoc/32), bit_flip);
+            setFloatReg(injectLoc/32, bit_flip);
+            return true;
+        }
+        return false;
     }
 
     /** Reads an integer register. */

@@ -387,6 +387,8 @@ DefaultFetch<Impl>::processCacheCompletion(PacketPtr pkt)
     memcpy(fetchBuffer[tid], pkt->getPtr<uint8_t>(), fetchBufferSize);
     fetchBufferValid[tid] = true;
 
+    // VUL_FETCHBUFFER This is where fetch buffer is written
+
     // Wake up the CPU (if it went to sleep and was waiting on
     // this completion event).
     cpu->wakeCPU();
@@ -1092,21 +1094,6 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
     instruction->setASID(tid);
 
     instruction->setThreadState(cpu->thread[tid]);
-    
-    //YOHAN
-    //if(thisPC.instAddr() == cpu->oldPC && thisPC.microPC() == cpu->oldMicroPC) {
-	if(cpu->oldInst == staticInst->disassemble(thisPC.instAddr())) {
-        if (cpu->changeDest) {
-            DPRINTF(Fetch, "Restore is called for detination register\n");
-            instruction->setDestRegIdx(cpu->oldDestIdx, cpu->oldDestReg);
-            //cpu->changeDest = false;
-        }
-        else if (cpu->changeSrc) {
-            DPRINTF(Fetch, "Restore is called for source reigster\n");
-            instruction->setSrcRegIdx(cpu->oldSrcIdx, cpu->oldSrcReg);
-            //cpu->changeSrc = false;
-        }
-    }
 
     DPRINTF(Fetch, "[tid:%i]: Instruction PC %#x (%d) created "
             "[sn:%lli].\n", tid, thisPC.instAddr(),
@@ -1135,8 +1122,14 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
     toDecode->insts[toDecode->size++] = instruction;
 
     //VUL_TRACKER Writing to Fetch Queue
-    if(this->cpu->pipeVulEnable)
-        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, P_SEQNUM, instruction->seqNum);
+    if(this->cpu->pipeVulEnable) {
+        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, INST_OPCODE, instruction->seqNum);
+        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, INST_PC, instruction->seqNum);
+        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, INST_SEQNUM, instruction->seqNum);
+        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, INST_FLAGS, instruction->seqNum);
+        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, INST_ARCHSRCREGSIDX, instruction->seqNum);
+        this->cpu->pipeVulT.vulOnWrite(P_FETCHQ, INST_ARCHDESTREGSIDX, instruction->seqNum);
+    }
 
     // Keep track of if we can take an interrupt at this boundary
     delayedCommit[tid] = instruction->isDelayedCommit();
@@ -1248,13 +1241,6 @@ DefaultFetch<Impl>::fetch(bool &status_change)
     const unsigned numInsts = fetchBufferSize / instSize;
     unsigned blkOffset = (fetchAddr - fetchBufferPC[tid]) / instSize;
 
-    //VUL_PIPELINE start
-    /*
-    vulParams vtemp = {0,false,false,0,0,0};
-    vulParams *vp = &vtemp;
-    */
-    //VUL_PIPELINE end
-
     // Loop through instruction memory from the cache.
     // Keep issuing while fetchWidth is available and branch is not
     // predicted taken
@@ -1308,6 +1294,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             if (!(curMacroop || inRom)) {
                 if (decoder[tid]->instReady()) {
                     staticInst = decoder[tid]->decode(thisPC);
+
                     // Increment stat of fetched instructions.
                     ++fetchedInsts;
 

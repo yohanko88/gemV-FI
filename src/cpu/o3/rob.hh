@@ -327,6 +327,9 @@ class ROB
 
     /** ROB Vulnerability calculator */
     RobVulCalc robVulCalc;                  //VUL_ROB
+    
+    //YOHAN: Flip a single bit in ROB
+    bool flipROB(unsigned injectLoc, ThreadID tid);
 
   private:
     /** The sequence number of the squashed instruction. */

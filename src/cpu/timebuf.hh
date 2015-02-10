@@ -80,7 +80,7 @@ class TimeBuffer
         wire(const wire &i)
             : buffer(i.buffer), index(i.index)
         { }
-		
+
         const wire &operator=(const wire &i)
         {
             buffer = i.buffer;

@@ -48,6 +48,7 @@
 #include "cpu/reg_class.hh"
 #include "base/statistics.hh"                                   //VUL_RENAME
 #include "base/vulnerability/vul_rename.hh"                     //VUL_RENAME
+#include "debug/FI.hh" //YOHAN: Debug flag for fault injection
 
 /**
  * Register rename map for a single class of registers (e.g., integer
@@ -120,7 +121,7 @@ class SimpleRenameMap
      */
     PhysRegIndex lookup(RegIndex arch_reg) const
     {
-        assert(arch_reg < map.size());
+        //assert(arch_reg < map.size());
         return map[arch_reg];
     }
 
@@ -137,7 +138,6 @@ class SimpleRenameMap
 
     /** Return the number of free entries on the associated free list. */
     unsigned numFreeEntries() const { return freeList->numFreeRegs(); }
-
 };
 
 
@@ -395,6 +395,25 @@ class UnifiedRenameMap
     unsigned numFreeEntries() const
     {
         return std::min(intMap.numFreeEntries(), floatMap.numFreeEntries());
+    }
+    
+    //YOHAN: Flip a single bit in rename map
+    bool flipRenameMap(unsigned injectLoc)
+    {
+        if(injectLoc/8 < TheISA::NumIntRegs) {
+            int bit_flip = intMap.lookup(injectLoc/8) ^ (1UL << (injectLoc%8));
+            DPRINTF(FI, "Bit Flip: Integer Rename Map %d: %d to %d\n", injectLoc/8, intMap.lookup(injectLoc/8), bit_flip);
+            intMap.setEntry(injectLoc/8, bit_flip);
+            return true;
+        }
+        else if(injectLoc/8 >= TheISA::NumIntRegs && injectLoc/8 < TheISA::NumFloatRegs+TheISA::NumIntRegs) {
+            injectLoc = injectLoc - TheISA::NumIntRegs*8;
+            int bit_flip = floatMap.lookup(injectLoc/8) ^ (1UL << (injectLoc%8));
+            DPRINTF(FI, "Bit Flip: Float Rename Map %d: %d to %d\n", injectLoc/8, floatMap.lookup(injectLoc/8), bit_flip);
+            floatMap.setEntry(injectLoc/8, bit_flip);
+            return true;
+        }
+        return false;
     }
     
     //Stats::Scalar renameMapVul;                                         //VUL_RENAME

@@ -812,14 +812,21 @@ class FullO3CPU : public BaseO3CPU
     /** Register file vulnerability calculator */
     RegVulCalc regVulCalc;                                  //VUL_TRACKER
     
-     //YOHAN: Fault injection in Register File
+    //YOHAN: Add parameter for fault injection
     unsigned injectFaultRF;
+    unsigned injectFaultROB;
     unsigned injectFaultFQ;
     unsigned injectFaultDQ;
+    unsigned injectFaultRQ;
+    unsigned injectFaultRM;
+    unsigned injectFaultHB;
+    unsigned injectFaultLSQ;
+    unsigned injectFaultIQ;
+    unsigned injectFaultIEWQ;
     unsigned injectTime;
     unsigned injectLoc;
-    
-    //YOHAN
+	
+    //YOHAN: Add parameters to restore static instruction
     bool changeDest;
     bool changeSrc;
     unsigned oldDestReg;
@@ -862,6 +869,7 @@ class FullO3CPU : public BaseO3CPU
 
     /** Ease of programming */
     int totalNumRegs;                                       //VUL_TRACKER
+    
 
     /** The cycle that the CPU was last activated by a new thread*/
     Tick lastActivatedCycle;

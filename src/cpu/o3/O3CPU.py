@@ -154,11 +154,17 @@ class DerivO3CPU(BaseCPU):
     pipeline_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
     rename_vul_enable = Param.Unsigned(0, "Enable ROB vulnerability analysis")
 	
-	#YOHAN: Add parameters to inject a single-bit fault in ROB
+	#YOHAN: Add parameter for fault injection
     injectFaultROB = Param.Unsigned(0, "Inject a single-bit fault in ROB or not (0: NO, 1: YES)")
     injectFaultRF = Param.Unsigned(0, "Inject a single-bit fault in Register File or not (0: NO, 1: YES)")
     injectFaultFQ = Param.Unsigned(0, "Inject a single-bit fault in Fetch Queue or not (0: NO, 1: YES)")
     injectFaultDQ = Param.Unsigned(0, "Inject a single-bit fault in Decode Queue or not (0: NO, 1: YES)")
+    injectFaultRQ = Param.Unsigned(0, "Inject a single-bit fault in Rename Queue or not (0: NO, 1: YES)")
+    injectFaultRM = Param.Unsigned(0, "Inject a single-bit fault in Rename Map or not (0: NO, 1: YES)")
+    injectFaultHB = Param.Unsigned(0, "Inject a single-bit fault in Rename History Buffer or not (0: NO, 1: YES)")
+    injectFaultLSQ = Param.Unsigned(0, "Inject a single-bit fault in Load Store Queue or not (0: NO, 1: YES)")
+    injectFaultIQ = Param.Unsigned(0, "Inject a single-bit fault in Instruction Queue or not (0: NO, 1: YES)")
+    injectFaultIEWQ = Param.Unsigned(0, "Inject a single-bit fault in IEWQ or not (0: NO, 1: YES)")
     injectTime = Param.Unsigned(0, "Time to inject fault")
     injectLoc = Param.Unsigned(0, "Bit location to inject fault")
 

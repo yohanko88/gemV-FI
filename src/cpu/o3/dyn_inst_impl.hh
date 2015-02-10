@@ -120,18 +120,9 @@ BaseO3DynInst<Impl>::initVars()
     this->_readySrcRegIdx.reset();
 
     _numDestMiscRegs = 0;
-    
-    //YOHAN
-    bitnumPC = 32;
-    bitnumDestRegs = 88;
-    bitnumSrcRegs = 297;
-    bitnumSeqNum = 32;
-    bitnumPredPC = 32;
-    bitnumOpClass = 32;
-    bitnumFlags = 73;
-	bitnumPSrcRegs = 64;
-	bitnumPDestRegs = 216;
-    bitnumDynInst = bitnumPC+bitnumDestRegs+bitnumSrcRegs+bitnumSeqNum+bitnumPredPC+bitnumOpClass+bitnumFlags+bitnumPSrcRegs+bitnumPDestRegs;
+
+    //VUL_TRACKER
+    this->accessor = this->OTHERS;
 
 #if TRACING_ON
     // Value -1 indicates that particular phase
@@ -158,7 +149,13 @@ BaseO3DynInst<Impl>::execute()
     bool no_squash_from_TC = this->thread->noSquashFromTC;
     this->thread->noSquashFromTC = true;
 
+    // VUL_TRACKER: Set the accessor here so that the correct duplicate
+    // field is read.
+    this->accessor = this->INST_Q;
+
     this->fault = this->staticInst->execute(this, this->traceData);
+
+    this->accessor = this->OTHERS;
 
     this->thread->noSquashFromTC = no_squash_from_TC;
 
@@ -176,7 +173,13 @@ BaseO3DynInst<Impl>::initiateAcc()
     bool no_squash_from_TC = this->thread->noSquashFromTC;
     this->thread->noSquashFromTC = true;
 
+    // VUL_TRACKER: Set the accessor here so that the correct duplicate
+    // field is read.
+    this->accessor = this->LS_Q;
+
     this->fault = this->staticInst->initiateAcc(this, this->traceData);
+
+    this->accessor = this->OTHERS;
 
     this->thread->noSquashFromTC = no_squash_from_TC;
 
@@ -200,7 +203,13 @@ BaseO3DynInst<Impl>::completeAcc(PacketPtr pkt)
         }
     }
 
+    // VUL_TRACKER: Set the accessor here so that the correct duplicate
+    // field is read.
+    this->accessor = this->LS_Q;
+
     this->fault = this->staticInst->completeAcc(pkt, this, this->traceData);
+
+    this->accessor = this->OTHERS;
 
     this->thread->noSquashFromTC = no_squash_from_TC;
 
