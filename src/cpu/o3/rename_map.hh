@@ -409,7 +409,7 @@ class UnifiedRenameMap
         else if(injectLoc/8 >= TheISA::NumIntRegs && injectLoc/8 < TheISA::NumFloatRegs+TheISA::NumIntRegs) {
             injectLoc = injectLoc - TheISA::NumIntRegs*8;
             int bit_flip = floatMap.lookup(injectLoc/8) ^ (1UL << (injectLoc%8));
-            DPRINTF(FI, "Bit Flip: Float Rename Map %d: %d to %d\n", injectLoc/8, floatMap.lookup(injectLoc/8), bit_flip);
+            DPRINTF(FI, "Bit Flip: Float Rename Map %d: %d to %d\n", injectLoc/8 + TheISA::NumIntRegs, floatMap.lookup(injectLoc/8), bit_flip);
             floatMap.setEntry(injectLoc/8, bit_flip);
             return true;
         }

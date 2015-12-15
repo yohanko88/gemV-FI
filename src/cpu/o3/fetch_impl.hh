@@ -1092,6 +1092,21 @@ DefaultFetch<Impl>::buildInst(ThreadID tid, StaticInstPtr staticInst,
     instruction->setTid(tid);
 
     instruction->setASID(tid);
+    
+    //YOHAN
+    //if(thisPC.instAddr() == cpu->oldPC && thisPC.microPC() == cpu->oldMicroPC) {
+    if(cpu->oldInst == staticInst->disassemble(thisPC.instAddr())) {
+        if (cpu->changeDest) {
+            DPRINTF(Fetch, "Restore is called for detination register\n");
+            instruction->setDestRegIdx(cpu->oldDestIdx, cpu->oldDestReg);
+            //cpu->changeDest = false;
+        }
+        else if (cpu->changeSrc) {
+            DPRINTF(Fetch, "Restore is called for source reigster\n");
+            instruction->setSrcRegIdx(cpu->oldSrcIdx, cpu->oldSrcReg);
+            //cpu->changeSrc = false;
+        }
+    }
 
     instruction->setThreadState(cpu->thread[tid]);
 

@@ -161,12 +161,15 @@ UnifiedRenameMap::setEntry(RegIndex arch_reg, PhysRegIndex phys_reg)
 
     switch (regIdxToClass(arch_reg, &rel_arch_reg)) {
       case IntRegClass:
+        DPRINTF(Rename, "Set arch reg %d to phys reg %d\n", rel_arch_reg, phys_reg);
         return setIntEntry(rel_arch_reg, phys_reg);
 
       case FloatRegClass:
+        DPRINTF(Rename, "Set arch reg %d to phys reg %d\n", rel_arch_reg, phys_reg);
         return setFloatEntry(rel_arch_reg, phys_reg);
 
       case CCRegClass:
+        DPRINTF(Rename, "Set arch reg %d to phys reg %d\n", rel_arch_reg, phys_reg);
         return setCCEntry(rel_arch_reg, phys_reg);
 
       case MiscRegClass:

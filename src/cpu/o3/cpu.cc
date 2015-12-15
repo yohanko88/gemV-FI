@@ -256,7 +256,9 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
       system(params->system),
       drainManager(NULL),
       lastRunningCycle(curCycle()),
-      regVulCalc(regFile.totalNumPhysRegs(), params->fi_reg),           //VUL_RF
+      regVulCalc(regFile.totalNumPhysRegs(), params->injectLoc, params->injectTime, params->checkFaultRF),           //VUL_RF
+      pipeVulT(params->injectLoc, params->injectTime, params->checkFaultPipe),           //VUL_RF
+      renameVulT(TheISA::NumIntRegs + TheISA::NumFloatRegs, numThreads, params->injectLoc, params->injectTime, params->checkFaultRename),                   //VUL_TRACKER
       injectFaultRF(params->injectFaultRF),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectFaultROB(params->injectFaultROB),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectFaultFQ(params->injectFaultFQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
@@ -266,9 +268,13 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
       injectFaultHB(params->injectFaultHB),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectFaultLSQ(params->injectFaultLSQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectFaultIQ(params->injectFaultIQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
+      injectFaultI2EQ(params->injectFaultI2EQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectFaultIEWQ(params->injectFaultIEWQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectTime(params->injectTime), injectLoc(params->injectLoc),         //YOHAN: Injection time & location
-      renameVulT(TheISA::NumIntRegs + TheISA::NumFloatRegs + TheISA::NumFloatRegs, numThreads),                   //VUL_TRACKER
+      checkFaultRF(params->checkFaultRF),                               //YOHAN: 0-> No check, 1-> Check
+      checkFaultPipe(params->checkFaultPipe),                               //YOHAN: 0-> No check, 1-> Check
+      checkFaultROB(params->checkFaultROB),                               //YOHAN: 0-> No check, 1-> Fault check
+      checkFaultRename(params->checkFaultRename),                               //YOHAN: 0-> No check, 1-> Fault check
       enableVulAnalysis(params->vul_analysis),                                //VUL_TRACKER
       robVulEnable(params->rob_vul_enable),                                   //VUL_TRACKER
       rfVulEnable(params->rf_vul_enable),                                   //VUL_TRACKER
@@ -647,7 +653,7 @@ FullO3CPU<Impl>::tick()
     DPRINTF(O3CPU, "\n\nFullO3CPU: Ticking main, FullO3CPU.\n");
     assert(!switchedOut());
     assert(getDrainState() != Drainable::Drained);
-    
+     
     //YOHAN: Fault injection for register file
     if(injectFaultRF == 1 && curTick() >= injectTime) {
         bool injectRF = regFile.flipRegFile(injectLoc);

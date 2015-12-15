@@ -99,6 +99,7 @@ DebugFlag('SQL', "SQL queries sent to the server")
 DebugFlag('StatEvents', "Statistics event tracking")
 DebugFlag('VulTracker', "Vulnerability tracker tracking")
 DebugFlag('VulTrackerROB', "Vulnerability tracker tracking")
+DebugFlag('Check', "Check Fault")
 
 CompoundFlag('GDBAll',
     [ 'GDBMisc', 'GDBAcc', 'GDBRead', 'GDBWrite', 'GDBSend', 'GDBRecv',

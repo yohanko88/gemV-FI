@@ -54,6 +54,8 @@
 #include "params/DerivO3CPU.hh"
 #include "sim/full_system.hh"
 
+#include "debug/FI.hh" //YOHAN
+
 #include "base/vulnerability/vul_tracker.hh"            //VUL_PIPELINE
 
 //#include "debug/vulRTL.hh"                              //VUL_PIPELINE
@@ -469,7 +471,26 @@ DefaultDecode<Impl>::sortInsts()
 {
     int insts_from_fetch = fromFetch->size;
 
+	//YOHAN: If a fault is injected into unused FetchQueue, do not inject faults
+    if((insts_from_fetch < ((cpu->injectLoc/309)+1)) && cpu->injectTime <= curTick() && cpu->injectFaultFQ == 1) {
+        DPRINTF(FI, "Bit Flip into Unused FetchQueue (SIZE)\n");
+        cpu->injectFaultFQ = 0;
+    }
+    
     for (int i = 0; i < insts_from_fetch; ++i) {
+         //YOHAN: Flip a single-bit fault into Fetch Queue
+         bool injectFQ = false;
+        if(cpu->injectTime <= curTick() && cpu->injectFaultFQ == 1) {
+            if(cpu->injectLoc >= 309) {
+                cpu->injectLoc -= 309;
+            }
+            else {
+                injectFQ = fromFetch->insts[i]->flipFQ(cpu->injectLoc);
+                if(injectFQ==true)
+                    cpu->injectFaultFQ = 0;
+            }
+        }
+        
         insts[fromFetch->insts[i]->threadNumber].push(fromFetch->insts[i]);
 
         //VUL_TRACKER Reading from Fetch Queue

@@ -253,7 +253,7 @@ for i in xrange(np):
                     elif parts[0] == "rename":
                         if parts[1] == "true":
                             system.cpu[i].rename_vul_enable = 1;
-							
+                            
     #YOHAN: Add parameter for fault injection
     system.cpu[i].injectTime = options.injectTime
     system.cpu[i].injectLoc = options.injectLoc
@@ -275,8 +275,35 @@ for i in xrange(np):
         system.cpu[i].injectFaultLSQ = 1;
     if options.injectArch == "IQ":
         system.cpu[i].injectFaultIQ = 1;
+    if options.injectArch == "I2EQ":
+        system.cpu[i].injectFaultI2EQ = 1;
     if options.injectArch == "IEWQ":
         system.cpu[i].injectFaultIEWQ = 1;
+        
+    if options.checkArch == "ROB":
+        system.cpu[i].checkFaultROB = 1;
+    if options.checkArch == "RF":
+        system.cpu[i].checkFaultRF = 1;
+    if options.checkArch == "FetchQueue":
+        system.cpu[i].checkFaultPipe = 1;
+    if options.checkArch == "DecodeQueue":
+        system.cpu[i].checkFaultPipe = 2;
+    if options.checkArch == "RenameQueue":
+        system.cpu[i].checkFaultPipe = 3;
+    if options.checkArch == "RenameMap":
+        system.cpu[i].checkFaultRename = 1;
+    if options.checkArch == "PrevHistoryBuffer":
+        system.cpu[i].checkFaultRename = 2;
+    if options.checkArch == "NewHistoryBuffer":
+        system.cpu[i].checkFaultRename = 3;
+    if options.checkArch == "LSQ":
+        system.cpu[i].checkFaultPipe = 7;
+    if options.checkArch == "IQ":
+        system.cpu[i].checkFaultPipe = 6;
+    if options.checkArch == "I2EQ":
+        system.cpu[i].checkFaultPipe = 4;
+    if options.checkArch == "IEWQ":
+        system.cpu[i].checkFaultPipe = 5;
 
     system.cpu[i].createThreads()
 

@@ -674,9 +674,11 @@ class FullO3CPU : public BaseO3CPU
     /** The issue/execute/writeback stages. */
     typename CPUPolicy::IEW iew;
 
+  public:
     /** The commit stage. */
     typename CPUPolicy::Commit commit;
 
+  protected:
     /** The register file. */
     PhysRegFile regFile;
 
@@ -812,6 +814,12 @@ class FullO3CPU : public BaseO3CPU
     /** Register file vulnerability calculator */
     RegVulCalc regVulCalc;                                  //VUL_TRACKER
     
+    /** Fetch Queue vulnerability calculator */
+    PipeVulTracker pipeVulT;
+    
+    /** Fetch Queue vulnerability calculator */
+    RenameVulCalc renameVulT;
+    
     //YOHAN: Add parameter for fault injection
     unsigned injectFaultRF;
     unsigned injectFaultROB;
@@ -822,10 +830,16 @@ class FullO3CPU : public BaseO3CPU
     unsigned injectFaultHB;
     unsigned injectFaultLSQ;
     unsigned injectFaultIQ;
+    unsigned injectFaultI2EQ;
     unsigned injectFaultIEWQ;
-    unsigned injectTime;
+    uint64_t injectTime;
     unsigned injectLoc;
-	
+    
+    unsigned checkFaultRF;
+    unsigned checkFaultPipe;
+    unsigned checkFaultROB;
+    unsigned checkFaultRename;
+    
     //YOHAN: Add parameters to restore static instruction
     bool changeDest;
     bool changeSrc;
@@ -836,12 +850,6 @@ class FullO3CPU : public BaseO3CPU
     Addr oldPC;
     Addr oldMicroPC;
     std::string oldInst;
-
-    /** Fetch Queue vulnerability calculator */
-    PipeVulTracker pipeVulT;
-
-    /** Fetch Queue vulnerability calculator */
-    RenameVulCalc renameVulT;
 
     /** Enable/disable vulnerability analysis */
     bool enableVulAnalysis;                                 //VUL_TRACKER

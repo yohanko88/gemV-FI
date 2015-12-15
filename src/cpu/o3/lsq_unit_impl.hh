@@ -58,6 +58,7 @@
 #include "debug/O3PipeView.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
+#include "debug/FI.hh"
 
 template<class Impl>
 LSQUnit<Impl>::WritebackEvent::WritebackEvent(DynInstPtr &_inst, PacketPtr _pkt,
@@ -112,6 +113,7 @@ LSQUnit<Impl>::completeDataAccess(PacketPtr pkt)
         iewStage->decrWb(inst->seqNum);
     } else {
         if (!state->noWB) {
+            //DPRINTF(LSQUnit, "Forwarding from store [sn:%lli].\n", storeQueue[state->idx].inst->seqNum);
             if (!TheISA::HasUnalignedMemAcc || !state->isSplit ||
                 !state->isLoad) {
                 writeback(inst, pkt);
@@ -371,14 +373,14 @@ LSQUnit<Impl>::insertLoad(DynInstPtr &load_inst)
     loadQueue[loadTail] = load_inst;
 
     //VUL_TRACKER Write IQ
-    if(this->cpu->lsqVulEnable) {
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_OPCODE, load_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PC, load_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_SEQNUM, load_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_FLAGS, load_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYSRCREGSIDX, load_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYDESTREGSIDX, load_inst->seqNum);
-    }
+    //if(this->cpu->lsqVulEnable) {
+    //    this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_OPCODE, load_inst->seqNum);
+    //    this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PC, load_inst->seqNum);
+    //    this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_SEQNUM, load_inst->seqNum);
+    //    this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_FLAGS, load_inst->seqNum);
+    //    this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYSRCREGSIDX, load_inst->seqNum);
+    //    this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYDESTREGSIDX, load_inst->seqNum);
+    //}
     
     incrLdIdx(loadTail);
 
@@ -390,22 +392,67 @@ template<class Impl>
 bool
 LSQUnit<Impl>::flipLSQ(unsigned injectLoc)
 {
-    int lsqIdx = 0;
-    while(lsqIdx < stores || lsqIdx < loads) {
-        if(injectLoc < 312 && lsqIdx < loads) {
-            loadQueue[loadHead]->flipLSQ(injectLoc);
+    if (injectLoc < (SQEntries-1) * 64) {
+        if((injectLoc/(32+32)+1) > stores) {
+            DPRINTF(FI, "Bit Flip into Unused LSQ\n");
             return true;
         }
-        else if (injectLoc >= 312 && injectLoc < 624 && lsqIdx < stores) {
-            storeQueue[storeHead].inst->flipLSQ(injectLoc-312);
-            return true;
+        else {
+            int storeId = (storeHead + injectLoc/(32+32)) % (SQEntries);
+            if(storeQueue[storeId].size == 0) {
+                DPRINTF(FI, "Bit Flip into Unused LSQ\n");
+                return true;
+            }
+            if(injectLoc%(32+32) < 32) {
+                int dataIdx = (injectLoc%(32+32)) / 8;
+                int dataLoc = (injectLoc%(32+32)) % 8;
+				
+                if(storeQueue[storeId].req->getSize() > (dataIdx + 1)) {
+                    DPRINTF(FI, "Bit Flip into Unused LSQ\n");
+                    return true;
+                }
+                else {
+                    int newValue = storeQueue[storeId].data[dataIdx] ^ (1UL << dataLoc);
+                    DPRINTF(FI, "Bit Flip: SQ Data %d: %#x to %#x\n", storeQueue[storeId].inst->seqNum, storeQueue[storeId].data[dataIdx], newValue);
+                    storeQueue[storeId].data[dataIdx] = newValue;
+                    return true;
+                }
+            }
+            else {
+                injectLoc = injectLoc%(32+32) - 32;
+                Addr newValue = storeQueue[storeId].req->getPaddr() ^ (1UL << injectLoc);
+                DPRINTF(FI, "Bit Flip: SQ Addr %d: %#x to %#x\n", storeQueue[storeId].inst->seqNum, storeQueue[storeId].req->getPaddr(), newValue);
+                storeQueue[storeId].req->setPaddr(newValue);
+                return true;
+            }
         }
-        if(injectLoc >= 624)
-            injectLoc -= 624;
-        lsqIdx++;
     }
-    cpu->injectLoc = injectLoc;
-    return false;
+    else {
+        injectLoc = injectLoc - ((SQEntries-1) * 64);
+        
+        if((injectLoc/(32+32)+1) > loads) {
+            DPRINTF(FI, "Bit Flip into Unused LSQ\n");
+            return true;
+        }
+        else {
+            int loadId = (loadHead + injectLoc/(32+32)) % (LQEntries);
+            if(injectLoc%(32+32) < 32) {
+                //int dataIdx = (injectLoc%(32+32)) / 8;
+                int dataLoc = (injectLoc%(32+32)) % 8;
+                int newValue = loadQueue[loadId]->memData[0] ^ (1UL << dataLoc);
+                DPRINTF(FI, "Bit Flip: LQ Data %d: %d to %d\n", loadQueue[loadId]->seqNum, loadQueue[loadId]->memData[0], newValue);
+                loadQueue[loadId]->memData[0] = newValue;
+                return true;
+            }
+            else {
+                injectLoc = injectLoc%(32+32) - 32;
+                Addr newValue = loadQueue[loadId]->effAddr ^ (1UL << injectLoc);
+                DPRINTF(FI, "Bit Flip: LQ effAddr %d: %#x to %#x\n", loadQueue[loadId]->seqNum, loadQueue[loadId]->effAddr, newValue);
+                loadQueue[loadId]->effAddr =  newValue;
+                return true;
+            }
+        }
+    }
 }
 
 template <class Impl>
@@ -415,7 +462,7 @@ LSQUnit<Impl>::insertStore(DynInstPtr &store_inst)
     // Make sure it is not full before inserting an instruction.
     assert((storeTail + 1) % SQEntries != storeHead);
     assert(stores < SQEntries);
-
+    
     DPRINTF(LSQUnit, "Inserting store PC %s, idx:%i [sn:%lli]\n",
             store_inst->pcState(), storeTail, store_inst->seqNumLSQ);
 
@@ -426,12 +473,12 @@ LSQUnit<Impl>::insertStore(DynInstPtr &store_inst)
 
     //VUL_TRACKER Write IQ
     if(this->cpu->lsqVulEnable) {
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_OPCODE, store_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PC, store_inst->seqNum);
+        //this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_OPCODE, store_inst->seqNum);
+        //this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PC, store_inst->seqNum);
         this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_SEQNUM, store_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_FLAGS, store_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYSRCREGSIDX, store_inst->seqNum);
-        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYDESTREGSIDX, store_inst->seqNum);
+        //this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_FLAGS, store_inst->seqNum);
+        //this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYSRCREGSIDX, store_inst->seqNum);
+        //this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_PHYDESTREGSIDX, store_inst->seqNum);
     }
 
     incrStIdx(storeTail);
@@ -617,11 +664,11 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst)
     load_fault = inst->initiateAcc();
 
     //VUL_TRACKER
-    if(this->cpu->lsqVulEnable) {
-        this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_OPCODE, inst->seqNum);
-        this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
-        this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
-    }
+    //if(this->cpu->lsqVulEnable) {
+        //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, inst->seqNum);
+        //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
+        //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
+    //} 
 
     if (inst->isTranslationDelayed() &&
         load_fault == NoFault)
@@ -679,11 +726,11 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst)
     Fault store_fault = store_inst->initiateAcc();
 
     //VUL_TRACKER
-    if(this->cpu->lsqVulEnable) {
+/*     if(this->cpu->lsqVulEnable) {
         this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_OPCODE, store_inst->seqNum);
         this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, store_inst->seqNum);
         this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, store_inst->seqNum);
-    }
+    } */
 
     if (store_inst->isTranslationDelayed() &&
         store_fault == NoFault)
@@ -727,11 +774,11 @@ LSQUnit<Impl>::commitLoad()
             loadQueue[loadHead]->pcState());
 
     //VUL_TRACKER READ LSQ 
-    if(this->cpu->lsqVulEnable) {
-        this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PC, loadQueue[loadHead]->seqNum);
-        this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, loadQueue[loadHead]->seqNum);
-        this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_FLAGS, loadQueue[loadHead]->seqNum);
-    }
+    // if(this->cpu->lsqVulEnable) {
+        // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PC, loadQueue[loadHead]->seqNum);
+        // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, loadQueue[loadHead]->seqNum);
+        // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_FLAGS, loadQueue[loadHead]->seqNum);
+    // }
 
     loadQueue[loadHead] = NULL;
 
@@ -856,16 +903,23 @@ LSQUnit<Impl>::writebackStores()
         storeQueue[storeWBIdx].committed = true;
 
         //VUL_TRACKER READ LSQ 
-        if(this->cpu->lsqVulEnable) {
-            this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PC, storeQueue[storeWBIdx].inst->seqNum);
-            this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, storeQueue[storeWBIdx].inst->seqNum);
-            this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_FLAGS, storeQueue[storeWBIdx].inst->seqNum);
-        }
+        // if(this->cpu->lsqVulEnable) {
+            // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PC, storeQueue[storeWBIdx].inst->seqNum);
+            // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, storeQueue[storeWBIdx].inst->seqNum);
+            // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_FLAGS, storeQueue[storeWBIdx].inst->seqNum);
+        // }
 
         assert(!inst->memData);
         inst->memData = new uint8_t[64];
 
         memcpy(inst->memData, storeQueue[storeWBIdx].data, req->getSize());
+        
+        int temp_data = 0;
+        int i;
+        for(i=0; i<req->getSize(); i++) {
+            int index = (*(storeQueue[storeWBIdx].data+i)) << (i*8);
+            temp_data += index;
+        }
 
         MemCmd command =
             req->isSwap() ? MemCmd::SwapReq :
@@ -906,8 +960,18 @@ LSQUnit<Impl>::writebackStores()
         DPRINTF(LSQUnit, "D-Cache: Writing back store idx:%i PC:%s "
                 "to Addr:%#x, data:%#x [sn:%lli]\n",
                 storeWBIdx, inst->pcState(),
-                req->getPaddr(), (int)*(inst->memData),
+                req->getPaddr(), temp_data,
                 inst->seqNum);
+                
+        //VUL_TRACKER
+        if(this->cpu->lsqVulEnable) {
+            this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, inst->seqNum);
+            //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
+            //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
+            
+            if(inst->isCommitted()) 
+                this->cpu->pipeVulT.vulOnCommit(P_LSQ, inst->seqNum, inst->numSrcRegs(), inst->numDestRegs());
+        }
 
         // @todo: Remove this SC hack once the memory system handles it.
         if (inst->isStoreConditional()) {
@@ -932,11 +996,11 @@ LSQUnit<Impl>::writebackStores()
                     inst->reqToVerify->setExtraData(0);
                     inst->completeAcc(data_pkt);
                     //VUL_TRACKER
-                    if(this->cpu->lsqVulEnable) {
+/*                     if(this->cpu->lsqVulEnable) {
                         this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_OPCODE, inst->seqNum);
                         this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
                         this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
-                    }
+                    } */
                 }
                 completeStore(storeWBIdx);
                 incrStIdx(storeWBIdx);
@@ -1180,16 +1244,16 @@ LSQUnit<Impl>::writeback(DynInstPtr &inst, PacketPtr pkt)
         // Complete access to copy data to proper place.
         inst->completeAcc(pkt);
         //VUL_TRACKER
-        if(this->cpu->lsqVulEnable) {
-            if(inst->isStore()) {
-                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_OPCODE, inst->seqNum);
-                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
-                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
-            }
+         if(this->cpu->lsqVulEnable) {
+            // if(inst->isStore()) {
+                // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_OPCODE, inst->seqNum);
+                // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
+                // this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
+            // }
             if(inst->isLoad()) {
-                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_OPCODE, inst->seqNum);
-                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
-                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
+                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, inst->seqNum);
+                //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYSRCREGSIDX, inst->seqNum);
+                //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PHYDESTREGSIDX, inst->seqNum);
             }
         }
     }
@@ -1384,5 +1448,7 @@ LSQUnit<Impl>::dumpInsts() const
 
     cprintf("\n");
 }
+
+
 
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__

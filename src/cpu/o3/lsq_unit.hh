@@ -61,6 +61,21 @@
 #include "mem/packet.hh"
 #include "mem/port.hh"
 #include "sim/fault_fwd.hh"
+#include "cpu/o3/lsq.hh"
+
+#include "arch/locked_mem.hh"
+#include "base/str.hh"
+#include "config/the_isa.hh"
+#include "cpu/checker/cpu.hh"
+#include "cpu/o3/lsq.hh"
+#include "cpu/o3/lsq_unit.hh"
+#include "debug/Activity.hh"
+#include "debug/IEW.hh"
+#include "debug/LSQUnit.hh"
+#include "debug/O3PipeView.hh"
+#include "mem/packet.hh"
+#include "mem/request.hh"
+#include "debug/FI.hh"
 
 struct DerivO3CPUParams;
 
@@ -273,9 +288,9 @@ class LSQUnit {
   public:
     /** Debugging function to dump instructions in the LSQ. */
     void dumpInsts() const;
-	
-	//YOHAN:
-	bool flipLSQ(unsigned injectLoc);
+    
+    //YOHAN:
+    bool flipLSQ(unsigned injectLoc);
 
   private:
     /** Pointer to the CPU. */
@@ -609,7 +624,7 @@ LSQUnit<Impl>::read(Request *req, Request *sreqLow, Request *sreqHigh,
             "storeHead: %i addr: %#x%s\n",
             load_idx, store_idx, storeHead, req->getPaddr(),
             sreqLow ? " split" : "");
-
+            
     if (req->isLLSC()) {
         assert(!sreqLow);
         // Disable recording the result temporarily.  Writing to misc
@@ -704,8 +719,15 @@ LSQUnit<Impl>::read(Request *req, Request *sreqLow, Request *sreqHigh,
                     storeQueue[store_idx].data + shift_amt, req->getSize());
 
             DPRINTF(LSQUnit, "Forwarding from store idx %i to load to "
-                    "addr %#x, data %#x\n",
-                    store_idx, req->getVaddr(), data);
+                    "addr %#x, data %#x [sn:%d]\n",
+                    store_idx, req->getVaddr(), *data, storeQueue[store_idx].inst->seqNum);                    
+
+            if(this->cpu->lsqVulEnable) {
+                this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, storeQueue[store_idx].inst->seqNum);
+                this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_SEQNUM, load_inst->seqNum);
+                //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_SEQNUM, storeQueue[store_idx].inst->seqNum);
+                //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_FLAGS, storeQueue[store_idx].inst->seqNum);
+            }
 
             PacketPtr data_pkt = new Packet(req, MemCmd::ReadReq);
             data_pkt->dataStatic(load_inst->memData);
@@ -759,8 +781,8 @@ LSQUnit<Impl>::read(Request *req, Request *sreqLow, Request *sreqHigh,
             // Do not generate a writeback event as this instruction is not
             // complete.
             DPRINTF(LSQUnit, "Load-store forwarding mis-match. "
-                    "Store idx %i to load addr %#x\n",
-                    store_idx, req->getVaddr());
+                    "Store idx %i to load addr %#x [sn:%d]\n",
+                    store_idx, req->getVaddr(), storeQueue[store_idx].inst->seqNum);
 
             // Must delete request now that it wasn't handed off to
             // memory.  This is quite ugly.  @todo: Figure out the
@@ -898,6 +920,8 @@ LSQUnit<Impl>::read(Request *req, Request *sreqLow, Request *sreqHigh,
         // No fault occurred, even though the interface is blocked.
         return NoFault;
     }
+     if(this->cpu->lsqVulEnable)
+        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_SEQNUM, load_inst->seqNum);
 
     return NoFault;
 }
@@ -908,11 +932,6 @@ LSQUnit<Impl>::write(Request *req, Request *sreqLow, Request *sreqHigh,
                      uint8_t *data, int store_idx)
 {
     assert(storeQueue[store_idx].inst);
-
-    DPRINTF(LSQUnit, "Doing write to store idx %i, addr %#x data %#x"
-            " | storeHead:%i [sn:%i]\n",
-            store_idx, req->getPaddr(), data, storeHead,
-            storeQueue[store_idx].inst->seqNum);
 
     storeQueue[store_idx].req = req;
     storeQueue[store_idx].sreqLow = sreqLow;
@@ -928,7 +947,26 @@ LSQUnit<Impl>::write(Request *req, Request *sreqLow, Request *sreqHigh,
     }
 
     memcpy(storeQueue[store_idx].data, data, size);
-
+    
+    int temp_data = 0;
+    int i;
+    for(i=0; i<size; i++) {
+        int index = (*(data+i)) << (i*8);
+        temp_data += index;
+    }
+    
+    DPRINTF(LSQUnit, "Doing write to store idx %i, addr %#x data %#x size %d"
+           " | storeHead:%i [sn:%i]\n",
+           store_idx, req->getPaddr(), temp_data, size, storeHead,
+           storeQueue[store_idx].inst->seqNum);
+           
+    //DPRINTF(LSQUnit, "SQ READ [addr: %#x]\n", req->getPaddr());
+     //VUL_TRACKER READ LSQ 
+    if(this->cpu->lsqVulEnable) {
+        //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_PC, storeQueue[store_idx].inst->seqNum);
+        this->cpu->pipeVulT.vulOnWrite(P_LSQ, INST_SEQNUM, storeQueue[store_idx].inst->seqNum);
+        //this->cpu->pipeVulT.vulOnRead(P_LSQ, INST_FLAGS, storeQueue[store_idx].inst->seqNum);
+    }
     // This function only writes the data to the store queue, so no fault
     // can happen here.
     return NoFault;

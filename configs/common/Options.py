@@ -126,8 +126,11 @@ def addCommonOptions(parser):
 
     #YOHAN: Fault injection options
     parser.add_option("--injectArch", type="choice", default="NO",
-                choices = ["ROB", "RF", "FetchQueue", "DecodeQueue", "RenameQueue", "RenameMap", "HistoryBuffer", "LSQ", "IQ", "IEWQ", "NO"],
+                choices = ["ROB", "RF", "FetchQueue", "DecodeQueue", "RenameQueue", "RenameMap", "HistoryBuffer", "LSQ", "IQ", "I2EQ", "IEWQ", "NO"],
                 help = "Which architecture do you want to inject faults? (FetchQueue and etc.) - Default: No injection")
+    parser.add_option("--checkArch", type="choice", default="NO",
+                choices = ["ROB", "RF", "FetchQueue", "DecodeQueue", "RenameQueue", "RenameMap", "PrevHistoryBuffer", "NewHistoryBuffer", "LSQ", "IQ", "I2EQ", "IEWQ", "NO"],
+                help = "Which architecture do you want to check faults? (FetchQueue and etc.) - Default: No check")
     parser.add_option("--injectTime", type="int", default="0",
                 help = "Time to inject fault.")
     parser.add_option("--injectLoc", type="int", default="0",

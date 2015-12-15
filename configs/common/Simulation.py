@@ -387,7 +387,7 @@ def run(options, root, testsys, cpu_class):
             # enable/disable vulnerability analysis VUL
             if options.vul_analysis == "yes":
                 switch_cpus[i].vul_analysis = 1
-				
+                
             #YOHAN: Add parameter for fault injection
             switch_cpus[i].injectTime = options.injectTime
             switch_cpus[i].injectLoc = options.injectLoc
@@ -409,8 +409,35 @@ def run(options, root, testsys, cpu_class):
                 switch_cpus[i].injectFaultLSQ = 1
             if options.injectArch == "IQ":
                 switch_cpus[i].injectFaultIQ = 1
+            if options.injectArch == "I2EQ":
+                switch_cpus[i].injectFaultI2EQ = 1
             if options.injectArch == "IEWQ":
                 switch_cpus[i].injectFaultIEWQ = 1
+                
+            if options.checkArch == "ROB":
+                switch_cpus[i].checkFaultROB = 1
+            if options.checkArch == "RF":
+                switch_cpus[i].checkFaultRF = 1
+            if options.checkArch == "FetchQueue":
+                switch_cpus[i].checkFaultPipe = 1
+            if options.checkArch == "DecodeQueue":
+                switch_cpus[i].checkFaultPipe = 2
+            if options.checkArch == "RenameQueue":
+                switch_cpus[i].checkFaultPipe = 3
+            if options.checkArch == "RenameMap":
+                switch_cpus[i].checkFaultRename = 1
+            if options.checkArch == "PrevHistoryBuffer":
+                switch_cpus[i].checkFaultRename = 2
+            if options.checkArch == "NewHistoryBuffer":
+                switch_cpus[i].checkFaultRename = 3
+            if options.checkArch == "LSQ":
+                switch_cpus[i].checkFaultPipe = 7
+            if options.checkArch == "IQ":
+                switch_cpus[i].checkFaultPipe = 6
+            if options.checkArch == "I2EQ":
+                switch_cpus[i].checkFaultPipe = 4
+            if options.checkArch == "IEWQ":
+                switch_cpus[i].checkFaultPipe = 5
 
         testsys.switch_cpus = switch_cpus
         testsys.switch_cpus_1 = switch_cpus_1

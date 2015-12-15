@@ -839,7 +839,7 @@ DefaultCommit<Impl>::commit()
         if (fromIEW->squash[tid] &&
             commitStatus[tid] != TrapPending &&
             fromIEW->squashedSeqNum[tid] <= youngestSeqNum[tid]) {
-
+			
             if (fromIEW->mispredictInst[tid]) {
                 DPRINTF(Commit,
                     "[tid:%i]: Squashing due to branch mispred PC:%#x [sn:%i]\n",
@@ -1026,13 +1026,14 @@ DefaultCommit<Impl>::commitInsts()
             if (commit_success) {
                 ++num_committed;
                 
-                if(this->cpu->robVulEnable) 
-                    rob->robVulCalc.vulOnCommit(tid, head_inst->seqNum);              //VUL_TRACKER
+                //if(this->cpu->robVulEnable) 
+                    //rob->robVulCalc.vulOnCommit(tid, head_inst->seqNum);              //VUL_TRACKER
 
                 changedROBNumEntries[tid] = true;
 
                 // Set the doneSeqNum to the youngest committed instruction.
                 toIEW->commitInfo[tid].doneSeqNum = head_inst->seqNumROB;
+				//DPRINTF(Commit, "ROB READ [sn:%lli]\n", head_inst->seqNumROB);
 
                 if (tid == 0) {
                     canHandleInterrupts =  (!head_inst->isDelayedCommit()) &&
@@ -1049,6 +1050,7 @@ DefaultCommit<Impl>::commitInsts()
 
                 // Keep track of the last sequence number commited
                 lastCommitedSeqNum[tid] = head_inst->seqNumROB;
+				//DPRINTF(Commit, "ROB READ [sn:%lli]\n", head_inst->seqNumROB);
 
                 // If this is an instruction that doesn't play nicely with
                 // others squash everything and restart fetch
@@ -1138,6 +1140,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         }
 
         toIEW->commitInfo[tid].nonSpecSeqNum = head_inst->seqNumROB;
+        //DPRINTF(Commit, "ROB READ [sn:%lli]\n", head_inst->seqNumROB);
 
         // Change the instruction so it won't try to commit again until
         // it is executed.
@@ -1260,8 +1263,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     // Update the commit rename map
     for (int i = 0; i < head_inst->numDestRegs(); i++) {
-        renameMap[tid]->setEntry(head_inst->flattenedDestRegIdx(i),
-                                 head_inst->renamedDestRegIdx(i));
+        renameMap[tid]->setEntry(head_inst->flattenedDestRegIdxROB(i),
+                                 head_inst->renamedDestRegIdxROB(i));
 
     }
 
@@ -1298,6 +1301,7 @@ DefaultCommit<Impl>::getInsts()
         
         //VUL_TRACKER
         inst->seqNumROB = inst->seqNum;
+		DPRINTF(Commit, "ROB WRITE [sn:%lli]\n", inst->seqNumROB);
 
         ThreadID tid = inst->threadNumber;
 

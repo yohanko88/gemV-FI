@@ -59,7 +59,7 @@ ROB<Impl>::ROB(O3CPU *_cpu, DerivO3CPUParams *params)
       numEntries(params->numROBEntries),
       squashWidth(params->squashWidth),
       numInstsInROB(0),
-      robVulCalc(params->numROBEntries, params->numThreads),                //VUL_ROB
+      robVulCalc(params->numROBEntries, params->numThreads, params->injectLoc, params->injectTime, params->checkFaultROB),                //VUL_ROB
       numThreads(params->numThreads)
 {
     std::string policy = params->smtROBPolicy;
@@ -258,17 +258,19 @@ ROB<Impl>::flipROB(unsigned injectLoc, ThreadID tid)
     //DynInstPtr head_inst = (*head_it);
     
     while(head_it != instList[tid].end()) {
-        if(injectLoc < 64) {
-          (*head_it)->flipROB(injectLoc);
-          return true;
+        if(injectLoc < 32) {
+          bool injectROB = (*head_it)->flipROB(injectLoc);
+          if(injectROB)
+            return true;
         }
         else {
+            injectLoc -= 32;
             head_it++;
-			injectLoc -= 64;
-		}
+        }
+            
     }
-	cpu->injectLoc = injectLoc;
-    return false;
+    DPRINTF(FI, "Bit Flip into Unused ROB\n");
+    return true;
 }
 
 template <class Impl>

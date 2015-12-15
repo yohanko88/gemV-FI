@@ -407,6 +407,7 @@ DefaultRename<Impl>::tick()
         if (fromCommit->commitInfo[tid].doneSeqNum != 0 &&
             !fromCommit->commitInfo[tid].squash &&
             renameStatus[tid] != Squashing) {
+            //DPRINTF(Rename, "ROB READ [sn:%lli]\n", fromCommit->commitInfo[tid].doneSeqNum); 
 
             removeFromHistory(fromCommit->commitInfo[tid].doneSeqNum,
                                   tid);
@@ -746,8 +747,27 @@ void
 DefaultRename<Impl>::sortInsts()
 {
     int insts_from_decode = fromDecode->size;
+    
+    //YOHAN: If a fault is injected into unused DecodeQueue, do not inject faults
+    if((insts_from_decode < ((cpu->injectLoc/309)+1)) && cpu->injectTime <= curTick() && cpu->injectFaultDQ == 1) {
+        DPRINTF(FI, "Bit Flip into Unused DecodeQueue (SIZE)\n");
+        cpu->injectFaultDQ = 0;
+    }
 
     for (int i = 0; i < insts_from_decode; ++i) {
+        //YOHAN
+         bool injectDQ = false;
+        if(cpu->injectTime <= curTick() && cpu->injectFaultDQ == 1) {
+            if(cpu->injectLoc >= 309) {
+                cpu->injectLoc -= 309;
+            }
+            else {
+                injectDQ = fromDecode->insts[i]->flipDQ(cpu->injectLoc);
+                if(injectDQ==true)
+                    cpu->injectFaultDQ = 0;
+            }
+        }
+        
         DynInstPtr inst = fromDecode->insts[i];
         insts[inst->threadNumber].push_back(inst);
 
@@ -914,9 +934,14 @@ DefaultRename<Impl>::doSquash(const InstSeqNum &squashed_seq_num, ThreadID tid)
             renameMap[tid]->setEntry(hb_it->archReg, hb_it->prevPhysReg);
             //VUL_TRACKER Write to Rename map
             if(this->cpu->renameVulEnable) {
-                this->cpu->renameVulT.vulOnReadHB(hb_it->archReg, hb_it->instSeqNum, tid);
+                RegIndex flat_rel_src_reg = hb_it->archReg;
+                if(hb_it->archReg >= TheISA::FP_Reg_Base)
+                    flat_rel_src_reg = flat_rel_src_reg - TheISA::FP_Reg_Base + TheISA::NumIntRegs;
+				else if(hb_it->archReg >= TheISA::CC_Reg_Base)
+					flat_rel_src_reg = flat_rel_src_reg - TheISA::CC_Reg_Base + TheISA::NumIntRegs + TheISA::NumFloatRegs;
+                this->cpu->renameVulT.vulOnReadHB(flat_rel_src_reg, hb_it->instSeqNum, tid);
                 this->cpu->renameVulT.vulOnSquash(hb_it->instSeqNum , tid);
-                this->cpu->renameVulT.vulOnWrite(hb_it->archReg, squashed_seq_num, tid);
+                this->cpu->renameVulT.vulOnWrite(flat_rel_src_reg, squashed_seq_num, tid);
             }
             
             // Put the renamed physical register back on the free list.
@@ -1012,8 +1037,7 @@ DefaultRename<Impl>::renameSrcRegs(DynInstPtr &inst, ThreadID tid)
 
             //VUL_TRACKER Read rename map
             if(this->cpu->renameVulEnable)
-                this->cpu->renameVulT.vulOnRead((int)(flat_rel_src_reg + TheISA::NumIntRegs), 
-                                    inst->seqNum, tid);
+                this->cpu->renameVulT.vulOnRead((int)(flat_rel_src_reg + TheISA::NumIntRegs), inst->seqNum, tid);
 
             fpRenameLookups++;
             break;
@@ -1449,10 +1473,10 @@ DefaultRename<Impl>::flipHistoryBuffer(unsigned injectLoc)
 {
     typename std::list<RenameHistory>::iterator buf_it;
     int bitSeqNum = 32;
-    int bitArchReg = 5;
+    int bitArchReg = 7;
     int bitNewPhysReg = 8;
     int bitPrevPhysReg = 8;
-	int bitTotal = bitSeqNum + bitArchReg + bitNewPhysReg + bitPrevPhysReg;
+    int bitTotal = bitSeqNum + bitArchReg + bitNewPhysReg + bitPrevPhysReg;
 
     for (ThreadID tid = 0; tid < numThreads; tid++) {
         buf_it = historyBuffer[tid].begin();
@@ -1495,11 +1519,12 @@ DefaultRename<Impl>::flipHistoryBuffer(unsigned injectLoc)
                 (*buf_it).prevPhysReg = bit_flip;
                 return true;
             }
-			injectLoc = injectLoc - bitTotal;
+            injectLoc = injectLoc - bitTotal;
             buf_it++;
         }
     }
-    return false;
+    DPRINTF(FI, "Bit Flip into Unused History Buffer\n");
+    return true;
 }
 
 template <class Impl>

@@ -201,6 +201,7 @@ class BaseDynInst : public RefCounted
 
     /** VUL_TRACKER PC state for this instruction. */
     TheISA::PCState pcROB;
+    TheISA::PCState pcLSQ;
 
     /* An amalgamation of a lot of boolean values into one */
     std::bitset<MaxFlags> instFlags;
@@ -292,6 +293,9 @@ class BaseDynInst : public RefCounted
      *  instruction.
      */
     TheISA::RegIndex _flatDestRegIdx[TheISA::MaxInstDestRegs];
+    
+    //YOHAN: ROB value
+    TheISA::RegIndex _flatDestRegIdxROB[TheISA::MaxInstDestRegs];
 
     /** Physical register index of the destination registers of this
      *  instruction.
@@ -301,6 +305,7 @@ class BaseDynInst : public RefCounted
     //VUL_TRACKER
     PhysRegIndex _destRegIdxIQ[TheISA::MaxInstDestRegs];
     PhysRegIndex _destRegIdxLSQ[TheISA::MaxInstDestRegs];
+    PhysRegIndex _destRegIdxROB[TheISA::MaxInstDestRegs];
 
     /** Physical register index of the source registers of this
      *  instruction.
@@ -411,6 +416,14 @@ class BaseDynInst : public RefCounted
         //vulT.vulOnRead(INST_RNMDESTREGSIDX, this->seqNum, idx);
         return _destRegIdx[idx];
     }
+    
+    //YOHAN
+    PhysRegIndex renamedDestRegIdxROB(int idx)
+    {
+        //VUL_TRACKER
+        //vulT.vulOnRead(INST_RNMDESTREGSIDX, this->seqNum, idx);
+        return _destRegIdxROB[idx];
+    }
 
     /** Returns the physical register index of the i'th source register. */
     PhysRegIndex renamedSrcRegIdx(int idx)
@@ -428,6 +441,12 @@ class BaseDynInst : public RefCounted
     {
         //vulT.vulOnRead(INST_FLTDESTREGSIDX, this->seqNum, idx);
         return _flatDestRegIdx[idx];
+    }
+    
+    //YOHAN
+    TheISA::RegIndex flattenedDestRegIdxROB(int idx)
+    {
+        return _flatDestRegIdxROB[idx];
     }
 
     /** Returns the physical register index of the previous physical register
@@ -449,6 +468,7 @@ class BaseDynInst : public RefCounted
         _destRegIdx[idx] = renamed_dest;
         _destRegIdxIQ[idx] = renamed_dest;                  //VUL_RENAME
         _destRegIdxLSQ[idx] = renamed_dest;                 //VUL_RENAME
+        _destRegIdxROB[idx] = renamed_dest; //YOHAN
         _prevDestRegIdx[idx] = previous_rename;                 
         //VUL_TRACKER
         //vulT.vulOnWrite(INST_RNMDESTREGSIDX, this->seqNum, idx);
@@ -474,6 +494,7 @@ class BaseDynInst : public RefCounted
     void flattenDestReg(int idx, TheISA::RegIndex flattened_dest)
     {
         _flatDestRegIdx[idx] = flattened_dest;
+        _flatDestRegIdxROB[idx] = flattened_dest;
         //VUL_TRACKER
         //vulT.vulOnWrite(INST_FLTDESTREGSIDX, this->seqNum, idx);
     }
@@ -892,6 +913,8 @@ class BaseDynInst : public RefCounted
         //VUL_TRACKER
         if(this->accessor == ROB)
             return pcROB;
+		else if(this->accessor == ROB)
+            return pcLSQ;
 
         return pc; 
     }
@@ -900,11 +923,15 @@ class BaseDynInst : public RefCounted
     const void pcState(const TheISA::PCState &val) { 
         pc = val;
         pcROB = val;
+        pcLSQ = val;
     }
     
     //YOHAN: Set the PC state of ROB of this instruction.
     const void pcRobState(const TheISA::PCState &val) { 
         pcROB = val;
+    }
+    const void pcLsqState(const TheISA::PCState &val) { 
+        pcLSQ = val;
     }
 
     /** Read the PC of this instruction. */
@@ -912,6 +939,8 @@ class BaseDynInst : public RefCounted
         //VUL_TRACKER
         if(this->accessor == ROB)
            return pcROB.instAddr();
+        else if(this->accessor == LS_Q)
+           return pcLSQ.instAddr();
 
         return pc.instAddr(); 
     }
@@ -921,6 +950,9 @@ class BaseDynInst : public RefCounted
         //VUL_TRACKER
         if(this->accessor == ROB)
             return pcROB.nextInstAddr();
+        else if(this->accessor == LS_Q)
+            return pcLSQ.nextInstAddr();
+
 
         return pc.nextInstAddr();
     }
@@ -930,6 +962,8 @@ class BaseDynInst : public RefCounted
         //VUL_TRACKER
         if(this->accessor == ROB)
             return pcROB.microPC();
+        else if(this->accessor == LS_Q)
+            return pcLSQ.microPC();
         
         return pc.microPC(); 
     }

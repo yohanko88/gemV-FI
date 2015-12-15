@@ -120,6 +120,14 @@ BaseO3DynInst<Impl>::initVars()
     this->_readySrcRegIdx.reset();
 
     _numDestMiscRegs = 0;
+    
+    //YOHAN
+    bitPC = 32;
+    bitDestRegs = 56;
+    bitSrcRegs = 189;
+    bitSeqNum = 32;
+    bitPSrcRegs = 64;
+    bitPDestRegs = 216;
 
     //VUL_TRACKER
     this->accessor = this->OTHERS;

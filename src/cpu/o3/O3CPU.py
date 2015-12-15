@@ -164,9 +164,17 @@ class DerivO3CPU(BaseCPU):
     injectFaultHB = Param.Unsigned(0, "Inject a single-bit fault in Rename History Buffer or not (0: NO, 1: YES)")
     injectFaultLSQ = Param.Unsigned(0, "Inject a single-bit fault in Load Store Queue or not (0: NO, 1: YES)")
     injectFaultIQ = Param.Unsigned(0, "Inject a single-bit fault in Instruction Queue or not (0: NO, 1: YES)")
+    injectFaultI2EQ = Param.Unsigned(0, "Inject a single-bit fault in Instruction Queue or not (0: NO, 1: YES)")
     injectFaultIEWQ = Param.Unsigned(0, "Inject a single-bit fault in IEWQ or not (0: NO, 1: YES)")
-    injectTime = Param.Unsigned(0, "Time to inject fault")
+    injectTime = Param.UInt64(0, "Time to inject fault")
     injectLoc = Param.Unsigned(0, "Bit location to inject fault")
+	
+    checkFaultPipe = Param.Unsigned(0, "Check a single-bit fault in Piepeline or not (0: NO, 1: YES)")
+    checkFaultROB = Param.Unsigned(0, "Check a single-bit fault in ROB or not (0: NO, 1: YES)")
+    checkFaultRF = Param.Unsigned(0, "Check a single-bit fault in Register File or not (0: NO, 1: YES)")
+    checkFaultRename = Param.Unsigned(0, "Check a single-bit fault in Rename Map or not (0: NO, 1: YES)")
+    checkFaultI2EQ = Param.Unsigned(0, "Check a single-bit fault in Instruction Queue or not (0: NO, 1: YES)")
+    checkFaultIEWQ = Param.Unsigned(0, "Check a single-bit fault in IEWQ or not (0: NO, 1: YES)")
 
     def addCheckerCpu(self):
         if buildEnv['TARGET_ISA'] in ['arm']:

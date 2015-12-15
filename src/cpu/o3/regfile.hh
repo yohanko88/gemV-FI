@@ -156,7 +156,7 @@ class PhysRegFile
     }
     
     //YOHAN: Flip a single bit in register file
-    bool flipRegFile (unsigned injectLoc)
+    bool flipRegFile (uint64_t injectLoc)
     {
         if(injectLoc < numIntPhysRegs()*32) {
             uint64_t bit_flip = readIntReg(injectLoc/32) ^ (1UL << (injectLoc%32));

@@ -55,6 +55,9 @@
 #include "params/DerivO3CPU.hh"
 #include "sim/core.hh"
 
+//YOHAN: DEBUG
+#include "debug/FI.hh"
+
 // clang complains about std::set being overloaded with Packet::set if
 // we open up the entire namespace std
 using std::list;
@@ -553,6 +556,8 @@ InstructionQueue<Impl>::insert(DynInstPtr &new_inst)
 
     DPRINTF(IQ, "Adding instruction [sn:%lli] PC %s to the IQ.\n",
             new_inst->seqNum, new_inst->pcState());
+            
+    DPRINTF(IQ, "IQ WRITE [sn:%d]\n", new_inst->seqNumIQ);
 
     assert(freeEntries != 0);
 
@@ -660,6 +665,29 @@ InstructionQueue<Impl>::getInstToExecute()
     assert(!instsToExecute.empty());
     DynInstPtr inst = instsToExecute.front();
     instsToExecute.pop_front();
+    
+    ListIt inst_list_it = instsToExecute.begin();
+    
+    if(cpu->injectTime <= curTick() && cpu->injectFaultI2EQ == 1) {
+        bool injectI2EQ = false;
+        while (inst_list_it != instsToExecute.end()) {
+            if(cpu->injectLoc >= 344)
+                cpu->injectLoc -= 344;
+            else {
+                injectI2EQ = (*inst_list_it)->flipI2EQ(cpu->injectLoc);
+                if(injectI2EQ==true) {
+                    cpu->injectFaultI2EQ = 0;
+                    break;
+                }
+            }
+            inst_list_it++;
+        }
+    }
+    
+    if(cpu->injectTime <= curTick() && cpu->injectFaultI2EQ == 1) {
+        DPRINTF(FI, "Bit Flip into Unused IEWQueue (SIZE)\n");
+        cpu->injectFaultI2EQ = 0;
+    }
 
     //VUL_TRACKER Read from Issue to Exec
     if(this->cpu->pipeVulEnable) {
@@ -894,6 +922,7 @@ InstructionQueue<Impl>::scheduleReadyInsts()
                     tid, issuing_inst->pcState(),
                     issuing_inst->seqNumIQ);
 
+            DPRINTF(IQ, "IQ READ [sn:%d]\n", issuing_inst->seqNumIQ);
             readyInsts[op_class].pop();
 
             if (!readyInsts[op_class].empty()) {
@@ -1000,8 +1029,8 @@ InstructionQueue<Impl>::flipIQ(unsigned injectLoc, ThreadID tid)
             injectLoc -= 312;
         }
     }
-    cpu->injectLoc = injectLoc;
-    return false;
+    DPRINTF(FI, "Bit Flip into Unused IQ\n");
+    return true;
 }
 
 template <class Impl>
@@ -1015,6 +1044,7 @@ InstructionQueue<Impl>::commit(const InstSeqNum &inst, ThreadID tid)
 
     while (iq_it != instList[tid].end() &&
            (*iq_it)->seqNumIQ <= inst) {
+        DPRINTF(IQ, "IQ READ [sn:%d]\n", (*iq_it)->seqNumIQ);
         ++iq_it;
         instList[tid].pop_front();
     }

@@ -869,7 +869,26 @@ DefaultIEW<Impl>::sortInsts()
     for (ThreadID tid = 0; tid < numThreads; tid++)
         assert(insts[tid].empty());
 #endif
+    
+    if((insts_from_rename < ((cpu->injectLoc/344)+1)) && cpu->injectTime <= curTick() && cpu->injectFaultRQ == 1) {
+        DPRINTF(FI, "Bit Flip into Unused RenameQueue (SIZE)\n");
+        cpu->injectFaultRQ = 0;
+    }
+
     for (int i = 0; i < insts_from_rename; ++i) {
+        //YOHAN
+        bool injectRQ = false;
+        if(cpu->injectTime <= curTick() && cpu->injectFaultRQ == 1) {
+            if(cpu->injectLoc >= 344) {
+                cpu->injectLoc -= 344;
+            }
+            else {
+                injectRQ = fromRename->insts[i]->flipRQ(cpu->injectLoc);
+                if(injectRQ==true)
+                    cpu->injectFaultRQ = 0;
+            }
+        }        
+
         insts[fromRename->insts[i]->threadNumber].push(fromRename->insts[i]);
 
         //VUL_TRACKER Reading from Rename Queue
@@ -1230,13 +1249,14 @@ DefaultIEW<Impl>::executeInsts()
     // Execute/writeback any instructions that are available.
     int insts_to_execute = fromIssue->size;
     int inst_num = 0;
+    
     for (; inst_num < insts_to_execute;
           ++inst_num) {
 
         DPRINTF(IEW, "Execute: Executing instructions from IQ.\n");
 
         DynInstPtr inst = instQueue.getInstToExecute();
-
+        
         DPRINTF(IEW, "Execute: Processing PC %s, [tid:%i] [sn:%i].\n",
                 inst->pcState(), inst->threadNumber,inst->seqNum);
 
@@ -1466,6 +1486,19 @@ DefaultIEW<Impl>::writebackInsts()
              toCommit->insts[inst_num]; inst_num++) {
         DynInstPtr inst = toCommit->insts[inst_num];
         ThreadID tid = inst->threadNumber;
+        
+        //yohan
+        bool injectIEWQ = false;
+        if(cpu->injectTime <= curTick() && cpu->injectFaultIEWQ == 1) {
+            if(cpu->injectLoc >= 96) {
+                cpu->injectLoc -= 96;
+            }
+            else {
+                injectIEWQ = toCommit->insts[inst_num]->flipIEWQ(cpu->injectLoc);
+                if(injectIEWQ==true)
+                    cpu->injectFaultIEWQ = 0;
+            }
+        }
 
         DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",
                 inst->seqNum, inst->pcState());
@@ -1502,6 +1535,11 @@ DefaultIEW<Impl>::writebackInsts()
         }
 
         decrWb(inst->seqNum);
+    }
+    
+    if(cpu->injectTime <= curTick() && cpu->injectFaultIEWQ == 1) {
+        DPRINTF(FI, "Bit Flip into Unused IEWQueue (SIZE)\n");
+        cpu->injectFaultIEWQ = 0;
     }
 }
 
@@ -1575,6 +1613,9 @@ DefaultIEW<Impl>::tick()
         if (fromCommit->commitInfo[tid].doneSeqNum != 0 &&
             !fromCommit->commitInfo[tid].squash &&
             !fromCommit->commitInfo[tid].robSquashing) {
+            if(this->cpu->robVulEnable)
+                this->cpu->commit.rob->robVulCalc.vulOnCommit(tid, fromCommit->commitInfo[tid].doneSeqNum);
+            //DPRINTF(IEW, "ROB READ [sn:%lli]\n", fromCommit->commitInfo[tid].doneSeqNum);
 
             ldstQueue.commitStores(fromCommit->commitInfo[tid].doneSeqNum,tid);
 
@@ -1585,12 +1626,14 @@ DefaultIEW<Impl>::tick()
         }
 
         if (fromCommit->commitInfo[tid].nonSpecSeqNum != 0) {
-
             //DPRINTF(IEW,"NonspecInst from thread %i",tid);
             if (fromCommit->commitInfo[tid].uncached) {
                 instQueue.replayMemInst(fromCommit->commitInfo[tid].uncachedLoad);
                 fromCommit->commitInfo[tid].uncachedLoad->setAtCommit();
             } else {
+                if(this->cpu->robVulEnable)
+                    this->cpu->commit.rob->robVulCalc.vulOnCommit(tid, fromCommit->commitInfo[tid].nonSpecSeqNum);
+                //DPRINTF(IEW, "ROB READ [sn:%lli]\n", fromCommit->commitInfo[tid].nonSpecSeqNum);
                 instQueue.scheduleNonSpec(
                     fromCommit->commitInfo[tid].nonSpecSeqNum);
             }
