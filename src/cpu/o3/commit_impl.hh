@@ -63,6 +63,7 @@
 #include "debug/Drain.hh"
 #include "debug/ExecFaulting.hh"
 #include "debug/O3PipeView.hh"
+#include "debug/FI.hh" //YOHAN
 #include "params/DerivO3CPU.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
@@ -1247,6 +1248,23 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             }
         }
     }
+	
+	//YOHAN
+	if(cpu->injectRF) {
+		for (int i = 0; i < head_inst->numDestRegs(); i++) {
+			if(cpu->injectLoc/32 == head_inst->renamedDestRegIdx(i)) {
+				DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+				cpu->injectRF = false;
+			}
+		}
+		for (int i = 0; i < head_inst->numSrcRegs(); i++) {
+			if(cpu->injectLoc/32 == head_inst->renamedSrcRegIdx(i)) {
+				DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+				cpu->injectRF = false;
+			}
+		}
+	}
+	
     DPRINTF(Commit, "Committing instruction with [sn:%lli] PC %s\n",
             head_inst->seqNumROB, head_inst->pcState());
     if (head_inst->traceData) {

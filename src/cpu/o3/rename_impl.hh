@@ -937,8 +937,8 @@ DefaultRename<Impl>::doSquash(const InstSeqNum &squashed_seq_num, ThreadID tid)
                 RegIndex flat_rel_src_reg = hb_it->archReg;
                 if(hb_it->archReg >= TheISA::FP_Reg_Base)
                     flat_rel_src_reg = flat_rel_src_reg - TheISA::FP_Reg_Base + TheISA::NumIntRegs;
-				else if(hb_it->archReg >= TheISA::CC_Reg_Base)
-					flat_rel_src_reg = flat_rel_src_reg - TheISA::CC_Reg_Base + TheISA::NumIntRegs + TheISA::NumFloatRegs;
+                else if(hb_it->archReg >= TheISA::CC_Reg_Base)
+                    flat_rel_src_reg = flat_rel_src_reg - TheISA::CC_Reg_Base + TheISA::NumIntRegs + TheISA::NumFloatRegs;
                 this->cpu->renameVulT.vulOnReadHB(flat_rel_src_reg, hb_it->instSeqNum, tid);
                 this->cpu->renameVulT.vulOnSquash(hb_it->instSeqNum , tid);
                 this->cpu->renameVulT.vulOnWrite(flat_rel_src_reg, squashed_seq_num, tid);
@@ -1062,6 +1062,10 @@ DefaultRename<Impl>::renameSrcRegs(DynInstPtr &inst, ThreadID tid)
           default:
             panic("Reg index is out of bound: %d.", src_reg);
         }
+        
+        //if(cpu->injectedArchRegIdx == -1 && cpu->injectLoc/32 == (int)renamed_reg) {
+        //    cpu->injectedArchRegIdx = (int)src_reg;
+        //}
 
         DPRINTF(Rename, "[tid:%u]: Looking up %s arch reg %i (flattened %i), "
                 "got phys reg %i\n", tid, RegClassStrings[regIdxToClass(src_reg)],
@@ -1161,6 +1165,10 @@ DefaultRename<Impl>::renameDestRegs(DynInstPtr &inst, ThreadID tid)
 
         // Mark Scoreboard entry as not ready
         scoreboard->unsetReg(rename_result.first);
+        
+        //if(cpu->injectedArchRegIdx == -1 && cpu->injectLoc/32 == (int)rename_result.first) {
+         //   cpu->injectedArchRegIdx = (int)flat_rel_dest_reg;
+        //}
 
         DPRINTF(Rename, "[tid:%u]: Renaming arch reg %i to physical "
                 "reg %i.\n", tid, (int)flat_rel_dest_reg,

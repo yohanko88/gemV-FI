@@ -271,6 +271,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
       injectFaultI2EQ(params->injectFaultI2EQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectFaultIEWQ(params->injectFaultIEWQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectTime(params->injectTime), injectLoc(params->injectLoc),         //YOHAN: Injection time & location
+      injectRF(false),                                                        //YOHAN
       checkFaultRF(params->checkFaultRF),                               //YOHAN: 0-> No check, 1-> Check
       checkFaultPipe(params->checkFaultPipe),                               //YOHAN: 0-> No check, 1-> Check
       checkFaultROB(params->checkFaultROB),                               //YOHAN: 0-> No check, 1-> Fault check
@@ -656,7 +657,8 @@ FullO3CPU<Impl>::tick()
      
     //YOHAN: Fault injection for register file
     if(injectFaultRF == 1 && curTick() >= injectTime) {
-        bool injectRF = regFile.flipRegFile(injectLoc);
+        //injectedArchRegIdx = -1;
+        injectRF = regFile.flipRegFile(injectLoc);
         if(injectRF)
             injectFaultRF = 0;
         else {
@@ -698,14 +700,14 @@ FullO3CPU<Impl>::tick()
                 injectFaultIQ = 0;
         }
     }
-	
+    
     if(injectFaultLSQ == 1 && curTick() >= injectTime) {
         bool injectLSQ = false;
-		for (ThreadID tid = 0; tid < numThreads; ++tid) {
+        for (ThreadID tid = 0; tid < numThreads; ++tid) {
             injectLSQ = iew.ldstQueue.flipLSQ(injectLoc, tid);
             if(injectLSQ)
                 injectFaultLSQ = 0;
-		}
+        }
     }
     
     //YOHAN: Fault injection for rename history buffer
