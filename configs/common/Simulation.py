@@ -391,6 +391,7 @@ def run(options, root, testsys, cpu_class):
             #YOHAN: Add parameter for fault injection
             switch_cpus[i].injectTime = options.injectTime
             switch_cpus[i].injectLoc = options.injectLoc
+            switch_cpus[i].maxTraceInst = options.maxTraceInst
             if options.injectArch == "ROB":
                 switch_cpus[i].injectFaultROB = 1
             if options.injectArch == "RF":

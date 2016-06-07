@@ -257,6 +257,7 @@ for i in xrange(np):
     #YOHAN: Add parameter for fault injection
     system.cpu[i].injectTime = options.injectTime
     system.cpu[i].injectLoc = options.injectLoc
+    system.cpu[i].maxTraceInst = options.maxTraceInst
     if options.injectArch == "ROB":
         system.cpu[i].injectFaultROB = 1;
     if options.injectArch == "RF":

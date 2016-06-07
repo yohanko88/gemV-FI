@@ -135,6 +135,8 @@ def addCommonOptions(parser):
                 help = "Time to inject fault.")
     parser.add_option("--injectLoc", type="int", default="0",
                 help = "Bit location to inject fault.")
+    parser.add_option("--maxTraceInst", type="int", default="0",
+                help = "Max trace instruction after fault injection.")
 
     # Enable Ruby
     parser.add_option("--ruby", action="store_true")
