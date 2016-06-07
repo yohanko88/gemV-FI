@@ -370,7 +370,7 @@ class DefaultCommit
 
     /** Wire to read information from rename queue. */
     typename TimeBuffer<RenameStruct>::wire fromRename;
-
+	
   public:
     /** ROB interface. */
     ROB *rob;

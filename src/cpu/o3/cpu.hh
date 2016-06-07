@@ -834,8 +834,12 @@ class FullO3CPU : public BaseO3CPU
     unsigned injectFaultIEWQ;
     uint64_t injectTime;
     unsigned injectLoc;
-	int injectedArchRegIdx;
-	bool injectRF;
+    unsigned maxTraceInst;
+    unsigned traceInstCnt;
+    int injectedArchRegIdx;
+    bool injectRF;
+    bool checkRF;
+    bool completeInjection;
     
     unsigned checkFaultRF;
     unsigned checkFaultPipe;

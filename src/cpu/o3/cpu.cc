@@ -271,7 +271,9 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
       injectFaultI2EQ(params->injectFaultI2EQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectFaultIEWQ(params->injectFaultIEWQ),                               //YOHAN: 0-> No injection, 1-> Fault injection
       injectTime(params->injectTime), injectLoc(params->injectLoc),         //YOHAN: Injection time & location
+      maxTraceInst(params->maxTraceInst),                                      //YOHAN: Injection time & location
       injectRF(false),                                                        //YOHAN
+      checkRF(false),                                                        //YOHAN
       checkFaultRF(params->checkFaultRF),                               //YOHAN: 0-> No check, 1-> Check
       checkFaultPipe(params->checkFaultPipe),                               //YOHAN: 0-> No check, 1-> Check
       checkFaultROB(params->checkFaultROB),                               //YOHAN: 0-> No check, 1-> Fault check
@@ -290,6 +292,10 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         _status = Running;
     } else {
         _status = SwitchedOut;
+    }
+    
+    if(maxTraceInst == 0) {
+        traceInstCnt = 0;
     }
 
     if (params->checker) {
@@ -656,9 +662,13 @@ FullO3CPU<Impl>::tick()
     assert(getDrainState() != Drainable::Drained);
      
     //YOHAN: Fault injection for register file
-    if(injectFaultRF == 1 && curTick() >= injectTime) {
+    if((checkFaultRF == 1 || injectFaultRF == 1) && curTick() >= injectTime) {
         //injectedArchRegIdx = -1;
-        injectRF = regFile.flipRegFile(injectLoc);
+        if(injectFaultRF == 1)
+            injectRF = regFile.flipRegFile(injectLoc);
+        else
+            checkRF = true;
+        
         if(injectRF)
             injectFaultRF = 0;
         else {
@@ -666,7 +676,7 @@ FullO3CPU<Impl>::tick()
                 injectLoc = injectLoc - regFile.totalNumPhysRegs()*32;
         }
     }
-    
+        
     //YOHAN: Fault injection for rename map
     if(injectFaultRM == 1 && curTick() >= injectTime) {
         bool injectRM = false;

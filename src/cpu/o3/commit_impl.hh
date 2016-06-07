@@ -840,7 +840,7 @@ DefaultCommit<Impl>::commit()
         if (fromIEW->squash[tid] &&
             commitStatus[tid] != TrapPending &&
             fromIEW->squashedSeqNum[tid] <= youngestSeqNum[tid]) {
-			
+            
             if (fromIEW->mispredictInst[tid]) {
                 DPRINTF(Commit,
                     "[tid:%i]: Squashing due to branch mispred PC:%#x [sn:%i]\n",
@@ -1034,7 +1034,7 @@ DefaultCommit<Impl>::commitInsts()
 
                 // Set the doneSeqNum to the youngest committed instruction.
                 toIEW->commitInfo[tid].doneSeqNum = head_inst->seqNumROB;
-				//DPRINTF(Commit, "ROB READ [sn:%lli]\n", head_inst->seqNumROB);
+                //DPRINTF(Commit, "ROB READ [sn:%lli]\n", head_inst->seqNumROB);
 
                 if (tid == 0) {
                     canHandleInterrupts =  (!head_inst->isDelayedCommit()) &&
@@ -1051,7 +1051,7 @@ DefaultCommit<Impl>::commitInsts()
 
                 // Keep track of the last sequence number commited
                 lastCommitedSeqNum[tid] = head_inst->seqNumROB;
-				//DPRINTF(Commit, "ROB READ [sn:%lli]\n", head_inst->seqNumROB);
+                //DPRINTF(Commit, "ROB READ [sn:%lli]\n", head_inst->seqNumROB);
 
                 // If this is an instruction that doesn't play nicely with
                 // others squash everything and restart fetch
@@ -1248,29 +1248,55 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
             }
         }
     }
-	
-	//YOHAN
-	if(cpu->injectRF) {
-		for (int i = 0; i < head_inst->numDestRegs(); i++) {
-			if(cpu->injectLoc/32 == head_inst->renamedDestRegIdx(i)) {
-				DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
-				cpu->injectRF = false;
-			}
-		}
-		for (int i = 0; i < head_inst->numSrcRegs(); i++) {
-			if(cpu->injectLoc/32 == head_inst->renamedSrcRegIdx(i)) {
-				DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
-				cpu->injectRF = false;
-			}
-		}
-	}
-	
+    
+    //YOHAN
+    if(cpu->injectRF && !cpu->completeInjection) {
+        for (int i = 0; i < head_inst->numDestRegs(); i++) {
+            if(cpu->injectLoc/32 == head_inst->renamedDestRegIdx(i)) {
+                DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+                cpu->completeInjection = true;
+                cpu->injectRF = false;
+            }
+        }
+        for (int i = 0; i < head_inst->numSrcRegs(); i++) {
+            if(cpu->injectLoc/32 == head_inst->renamedSrcRegIdx(i)) {
+                DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+                cpu->completeInjection = true;
+                cpu->injectRF = false;
+            }
+        }
+    }
+    
+    //YOHAN
+    if(cpu->checkRF && !cpu->completeInjection) {
+        for (int i = 0; i < head_inst->numDestRegs(); i++) {
+            if(cpu->injectLoc/32 == head_inst->renamedDestRegIdx(i)) {
+                DPRINTF(FI, "Arch Reg r%d Bit Non-Flip in %s\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+                cpu->completeInjection = true;
+                cpu->checkRF = false;
+            }
+        }
+        for (int i = 0; i < head_inst->numSrcRegs(); i++) {
+            if(cpu->injectLoc/32 == head_inst->renamedSrcRegIdx(i)) {
+                DPRINTF(FI, "Arch Reg r%d Bit Non-Flip in %s\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+                cpu->completeInjection = true;
+                cpu->checkRF = false;
+            }
+        }
+    }
+    
     DPRINTF(Commit, "Committing instruction with [sn:%lli] PC %s\n",
             head_inst->seqNumROB, head_inst->pcState());
     if (head_inst->traceData) {
         head_inst->traceData->setFetchSeq(head_inst->seqNumROB);
         head_inst->traceData->setCPSeq(thread[tid]->numOp);
-        head_inst->traceData->dump();
+        //YOHAN
+        if(cpu->maxTraceInst == 0)
+            head_inst->traceData->dump();
+        else if(cpu->maxTraceInst > cpu->traceInstCnt && cpu->completeInjection) {
+            head_inst->traceData->dump();
+            cpu->traceInstCnt += 1;
+        }
         delete head_inst->traceData;
         head_inst->traceData = NULL;
     }
@@ -1319,7 +1345,7 @@ DefaultCommit<Impl>::getInsts()
         
         //VUL_TRACKER
         inst->seqNumROB = inst->seqNum;
-		DPRINTF(Commit, "ROB WRITE [sn:%lli]\n", inst->seqNumROB);
+        DPRINTF(Commit, "ROB WRITE [sn:%lli]\n", inst->seqNumROB);
 
         ThreadID tid = inst->threadNumber;
 
