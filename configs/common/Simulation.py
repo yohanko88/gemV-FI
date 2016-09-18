@@ -392,6 +392,7 @@ def run(options, root, testsys, cpu_class):
             switch_cpus[i].injectTime = options.injectTime
             switch_cpus[i].injectLoc = options.injectLoc
             switch_cpus[i].maxTraceInst = options.maxTraceInst
+            switch_cpus[i].traceFault = options.traceFault
             if options.injectArch == "ROB":
                 switch_cpus[i].injectFaultROB = 1
             if options.injectArch == "RF":

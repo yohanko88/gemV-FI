@@ -137,6 +137,10 @@ def addCommonOptions(parser):
                 help = "Bit location to inject fault.")
     parser.add_option("--maxTraceInst", type="int", default="0",
                 help = "Max trace instruction after fault injection.")
+    parser.add_option("--traceFault", type="int", default="0",
+                help = "Trace corrupted registers and memory (0: NO, 1: YES) - Default: No trace")
+    parser.add_option("--injectFunc", type="string",
+                help = "Functions which you want to inject faults - Default: All functions")
 
     # Enable Ruby
     parser.add_option("--ruby", action="store_true")

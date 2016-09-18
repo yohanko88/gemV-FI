@@ -258,6 +258,7 @@ for i in xrange(np):
     system.cpu[i].injectTime = options.injectTime
     system.cpu[i].injectLoc = options.injectLoc
     system.cpu[i].maxTraceInst = options.maxTraceInst
+    system.cpu[i].traceFault = options.traceFault
     if options.injectArch == "ROB":
         system.cpu[i].injectFaultROB = 1;
     if options.injectArch == "RF":
