@@ -74,6 +74,8 @@ if 'O3CPU' in env['CPU_MODELS']:
     DebugFlag('StoreSet')
     DebugFlag('Writeback')
     DebugFlag('FI') #YOHAN: Add parameter to check the result of fault injection
+    DebugFlag('FaultTrace') #YOHAN: Add parameter to check the result of fault injection
+    DebugFlag('RegTrace') #YOHAN: Add parameter to check the result of fault injection
 
     CompoundFlag('O3CPUAll', [ 'Fetch', 'Decode', 'Rename', 'IEW', 'Commit',
         'IQ', 'ROB', 'FreeList', 'LSQ', 'LSQUnit', 'StoreSet', 'MemDepUnit',

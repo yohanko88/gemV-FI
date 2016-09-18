@@ -156,14 +156,16 @@ class PhysRegFile
     }
     
     //YOHAN: Flip a single bit in register file
-    bool flipRegFile (uint64_t injectLoc)
+    bool flipRegFile (uint64_t injectLoc, uint64_t *originalRegData)
     {
         if(injectLoc < numIntPhysRegs()*32) {
+			*originalRegData = readIntReg(injectLoc/32);
             uint64_t bit_flip = readIntReg(injectLoc/32) ^ (1UL << (injectLoc%32));
             DPRINTF(FI, "Bit Flip: Integer Physical Register %d: %#x to %#x\n", injectLoc/32, readIntReg(injectLoc/32), bit_flip);
             setIntReg(injectLoc/32, bit_flip);
             return true;
         } else {
+			*originalRegData = readFloatReg(injectLoc/32);
             uint32_t temp = readFloatReg(injectLoc/32);
             uint32_t bit_flip = temp ^ (1UL << (injectLoc%32));
             DPRINTF(FI, "Bit Flip: Float Physical Register %d: %#x to %#x\n", injectLoc/32, readFloatReg(injectLoc/32), bit_flip);

@@ -67,6 +67,7 @@
 #include "sim/system.hh"
 
 #include "debug/VulTracker.hh"      //VUL_TRACKER
+#include "debug/FaultTrace.hh"      //VUL_TRACKER
 
 #if THE_ISA == ALPHA_ISA
 #include "arch/alpha/osfpal.hh"
@@ -274,6 +275,9 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
       maxTraceInst(params->maxTraceInst),                                      //YOHAN: Injection time & location
       injectRF(false),                                                        //YOHAN
       checkRF(false),                                                        //YOHAN
+      corruptedRF(false),                                                        //YOHAN
+      corruptedMem(false),                                                        //YOHAN
+      traceFault(params->traceFault),                                      //YOHAN: Trace corrupted register and memory
       checkFaultRF(params->checkFaultRF),                               //YOHAN: 0-> No check, 1-> Check
       checkFaultPipe(params->checkFaultPipe),                               //YOHAN: 0-> No check, 1-> Check
       checkFaultROB(params->checkFaultROB),                               //YOHAN: 0-> No check, 1-> Fault check
@@ -288,6 +292,10 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
       renameVulEnable(params->rename_vul_enable),                                   //VUL_TRACKER
       totalNumRegs(regFile.totalNumPhysRegs())                                //VUL_TRACKER
 {
+    //YOHAN
+    Callback *cb = new MakeCallback<FullO3CPU, &FullO3CPU<Impl>::exitCallback>(this);
+    registerExitCallback(cb);
+    
     if (!params->switched_out) {
         _status = Running;
     } else {
@@ -518,7 +526,350 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 template <class Impl>
 FullO3CPU<Impl>::~FullO3CPU()
 {
+}
 
+
+//YOHAN
+template <class Impl>
+void
+FullO3CPU<Impl>::exitCallback()
+{
+    faultyRegIt = faultyRegs.begin();
+    faultyMemIt = faultyMems.begin();
+    
+    if(corruptedRF == true && corruptedMem == true && faultyRegs.end() == faultyRegIt && faultyMems.end() == faultyMemIt)
+        DPRINTF(FI, "Masked by read-write (register and memory)\n");
+    
+    else if(corruptedRF == true && corruptedMem == false && faultyRegs.end() == faultyRegIt && faultyMems.end() == faultyMemIt)
+        DPRINTF(FI, "Masked by read-write (register)\n");
+        
+    while(faultyRegs.end()!= faultyRegIt) {
+        DPRINTF(FI, "Reg %d is faulty\n", *faultyRegIt);
+        faultyRegIt++;
+    }
+    
+    while(faultyMems.end()!= faultyMemIt) {
+        DPRINTF(FI, "Addr %#x is faulty\n", *faultyMemIt);
+        faultyMemIt++;
+    }
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::deleteFaultyRegs(int reg_idx)
+{
+    faultyRegIt = std::find(faultyRegs.begin(), faultyRegs.end(), reg_idx);
+    if(faultyRegIt != faultyRegs.end()) {
+        faultyRegs.erase(faultyRegIt);
+        DPRINTF(FaultTrace, "Faulty Reg %d is deleted\n", reg_idx);
+        return true;
+    }
+    return false;
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::deleteFaultyMems(Addr mem_addr)
+{
+    faultyMemIt = std::find(faultyMems.begin(), faultyMems.end(), mem_addr);
+    if(faultyMemIt != faultyMems.end()) {
+        faultyMems.erase(faultyMemIt);
+        DPRINTF(FaultTrace, "Faulty Mem %#x is deleted\n", mem_addr);
+        return true;
+    }
+    return false;
+}
+
+template <class Impl>
+void
+FullO3CPU<Impl>::insertFaultyRegs(int reg_idx)
+{
+    faultyRegs.push_back(reg_idx);
+    faultyRegs.sort();
+    faultyRegs.unique();
+    corruptedRF = true;
+    DPRINTF(FaultTrace, "Faulty Reg %d is inserted\n", reg_idx);
+}
+
+template <class Impl>
+void
+FullO3CPU<Impl>::insertFaultyMems(Addr mem_addr)
+{
+    faultyMems.push_back(mem_addr);
+    faultyMems.sort();
+    faultyMems.unique();
+    corruptedMem = true;
+    DPRINTF(FaultTrace, "Faulty Mem %#x is inserted\n", mem_addr);
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isFlag(int srcRegId)
+{
+    if(srcRegId == 37 || srcRegId == 38 || srcRegId == 39)
+        return true;
+    return false;
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isZero(int srcRegId)
+{
+    if(srcRegId == 33)
+        return true;
+    return false;
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isConditional(DynInstPtr inst)
+{
+    std::string sym_str = inst->staticInst->disassemble(inst->instAddr());
+        
+    if (sym_str.find("eq") != string::npos || sym_str.find("ne") != string::npos ||  sym_str.find("cs") != string::npos ||  sym_str.find("cc") != string::npos ||  sym_str.find("pl") != string::npos ||  sym_str.find("vs") != string::npos ||  sym_str.find("vc") != string::npos ||  sym_str.find("hi") != string::npos || sym_str.find("ls") != string::npos || sym_str.find("ge") != string::npos || sym_str.find("lt") != string::npos || sym_str.find("gt") != string::npos || sym_str.find("le") != string::npos) {
+        return true;
+    } 
+    return false;
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isIncorrectBranch(DynInstPtr inst)
+{
+    uint32_t NZ = 0;
+    uint32_t C = 0;
+    uint32_t V = 0;
+    
+    bool corruptedBranch;
+    
+    for(int i = 0; i < inst->numSrcRegs(); i++) {
+        if(inst->srcRegIdx(i) == 37) {
+            NZ = readIntReg(inst->renamedSrcRegIdx(i));
+        }
+        else if(inst->srcRegIdx(i) == 38) {
+            C = readIntReg(inst->renamedSrcRegIdx(i));
+        }
+        else if(inst->srcRegIdx(i) == 39) {
+            V = readIntReg(inst->renamedSrcRegIdx(i));
+        }
+    }
+   
+    corruptedBranch = testPredicate(NZ, C, V, (ConditionCode)(uint32_t)inst->staticInst->machInst.condCode);
+	    
+    for(int i = 0; i < inst->numSrcRegs(); i++) {
+        faultyRegIt = std::find(faultyRegs.begin(), faultyRegs.end(), inst->srcRegIdx(i));
+        if(faultyRegIt != faultyRegs.end()) {
+            if(inst->srcRegIdx(i) == 37) {
+                NZ = originalRegs[inst->srcRegIdx(i)];
+            }
+            else if(inst->srcRegIdx(i) == 38) {
+                C = originalRegs[inst->srcRegIdx(i)];
+            }
+            else if(inst->srcRegIdx(i) == 38) {
+                V = originalRegs[inst->srcRegIdx(i)];
+            }
+        }
+    }
+    
+    if(testPredicate(NZ, C, V, (ConditionCode)(uint32_t)inst->staticInst->machInst.condCode) == corruptedBranch)
+        return false;
+    else
+        return true;
+}
+
+template <class Impl>
+void
+FullO3CPU<Impl>::updateDestRegs(DynInstPtr inst)
+{
+    bool corruptedPredicate = inst->readPredicate();
+    corruptedSrcRegs = new uint64_t [inst->numSrcRegs()];
+    corruptedDestRegs = new uint64_t [inst->numDestRegs()];
+    
+    int numSrcRegs;
+    if(isConditional(inst))
+        numSrcRegs = inst->numSrcRegs() - 1;
+    else
+        numSrcRegs = inst->numSrcRegs();
+    
+    for(int i = 0; i < inst->numDestRegs(); i++) {
+        if(!isZero(inst->destRegIdx(i))) {
+            if(inst->renamedDestRegIdx(i) < 128) {
+                corruptedDestRegs[i] = readIntReg(inst->renamedDestRegIdx(i));
+                DPRINTF(FaultTrace, "Corrupted Dest Arch Reg %d is %#x\n", inst->destRegIdx(i), corruptedDestRegs[i]);
+            }
+            else if(inst->renamedDestRegIdx(i) < 256)
+                corruptedDestRegs[i] = readFloatReg(inst->renamedDestRegIdx(i));
+        }
+    }
+    
+    bool incorrectBranch = isIncorrectBranch(inst);
+    
+    for(int i = 0; i < numSrcRegs; i++) {
+        if(!isZero(inst->srcRegIdx(i))) {
+            faultyRegIt = std::find(faultyRegs.begin(), faultyRegs.end(), inst->srcRegIdx(i));
+            if(faultyRegIt != faultyRegs.end()) {
+                if(inst->renamedSrcRegIdx(i) < 128) {
+                    corruptedSrcRegs[i] = readIntReg(inst->renamedSrcRegIdx(i));
+                    setIntReg(inst->renamedSrcRegIdx(i), originalRegs[inst->srcRegIdx(i)]);
+                    DPRINTF(FaultTrace, "Original Src Arch Reg %d is %#x\n", inst->srcRegIdx(i), originalRegs[inst->srcRegIdx(i)]);
+                }
+                else if(inst->renamedSrcRegIdx(i) < 256) {
+                    corruptedSrcRegs[i] = readFloatReg(inst->renamedSrcRegIdx(i));
+                    setFloatReg(inst->renamedSrcRegIdx(i), originalRegs[inst->srcRegIdx(i)]);
+                }
+                
+                if(inst->isLoad() && inst->readPredicate() && !isFlag(inst->srcRegIdx(i)))
+                    DPRINTF(FaultTrace, "Incorrect Mem Addr %#x is taken\n", inst->effAddr);
+            }
+        }
+    }
+        
+    if(!inst->isLoad() && !inst->isStore() && !isBranch(inst))
+        inst->execute();
+    
+    if(inst->readPredicate() != corruptedPredicate || incorrectBranch)
+        DPRINTF(FaultTrace, "Incorrect branch is taken\n");
+    
+    
+    for(int i = 0; i < numSrcRegs; i++) {
+        if(!isZero(inst->srcRegIdx(i))) {
+            faultyRegIt = std::find(faultyRegs.begin(), faultyRegs.end(), inst->srcRegIdx(i));
+            if(faultyRegIt != faultyRegs.end()) {
+                if(inst->renamedSrcRegIdx(i) < 128) {
+                    setIntReg(inst->renamedSrcRegIdx(i), corruptedSrcRegs[i]);
+                }
+                else if(inst->renamedSrcRegIdx(i) < 256)
+                    setFloatReg(inst->renamedSrcRegIdx(i), corruptedSrcRegs[i]);
+            }
+        }
+    }   
+    
+    for(int i = 0; i < inst->numDestRegs(); i++) {
+        if(!isZero(inst->destRegIdx(i))) {
+            insertFaultyRegs(inst->destRegIdx(i));
+            if(inst->renamedDestRegIdx(i) < 128) {
+                originalRegs[inst->destRegIdx(i)] = readIntReg(inst->renamedDestRegIdx(i));
+            }
+            else if(inst->renamedDestRegIdx(i) < 256) {
+                originalRegs[inst->destRegIdx(i)] = readFloatReg(inst->renamedDestRegIdx(i));
+            }
+        }
+    }
+
+    if(!corruptedPredicate) {
+        for(int i = 0; i < inst->numDestRegs(); i++) {
+            if(!isZero(inst->destRegIdx(i))) {
+                if(inst->renamedDestRegIdx(i) < 128) {
+                    setIntReg(inst->renamedDestRegIdx(i), corruptedDestRegs[i]);
+                }
+                else if(inst->renamedDestRegIdx(i) < 256)
+                    setFloatReg(inst->renamedDestRegIdx(i), corruptedDestRegs[i]);
+            }
+        }
+    }
+    
+    for(int i = 0; i < inst->numDestRegs(); i++) {
+        if(!isZero(inst->destRegIdx(i)) && !inst->isLoad() && !inst->isStore() && !isBranch(inst)) {
+            if(inst->readPredicate()) {
+                faultyRegIt = std::find(faultyRegs.begin(), faultyRegs.end(), inst->destRegIdx(i));
+                if(faultyRegIt != faultyRegs.end()) {
+                    if(inst->renamedDestRegIdx(i) < 128) {
+                        if(readIntReg(inst->renamedDestRegIdx(i)) == corruptedDestRegs[i]) {
+                            DPRINTF(FaultTrace, "Faulty Reg %d is masked by %s\n", inst->destRegIdx(i), inst->staticInst->getName());
+                            deleteFaultyRegs(inst->destRegIdx(i));
+                        }
+                    }
+                    else if(inst->renamedSrcRegIdx(i) < 256) {
+                        if(readFloatReg(inst->renamedDestRegIdx(i)) == corruptedDestRegs[i]) {
+                            DPRINTF(FaultTrace, "Faulty Reg %d is masked by %s\n", inst->destRegIdx(i), inst->staticInst->getName());
+                            deleteFaultyRegs(inst->destRegIdx(i));
+                        }
+                    }
+                }
+                else {
+                    bool hasFault = false;
+                    for(int j = 0; j < numSrcRegs; j++) {
+                        if(inst->srcRegIdx(j) == inst->destRegIdx(i)) {
+                            faultyRegIt = std::find(faultyRegs.begin(), faultyRegs.end(), inst->destRegIdx(i));
+                            if(faultyRegIt != faultyRegs.end()) {
+                              hasFault = true;
+                              break;
+                            }
+                        }
+                    }
+                    
+                    if(!hasFault) {
+                        DPRINTF(FaultTrace, "Faulty Reg %d is masked by predicated false\n", inst->destRegIdx(i));
+                        deleteFaultyRegs(inst->destRegIdx(i));
+                    }
+                }
+            }
+        }
+        else {
+            
+        }
+    }
+    
+    if(!inst->isLoad() && !inst->isStore() && !isBranch(inst))
+        inst->execute();
+    
+    for(int i = 0; i < inst->numDestRegs(); i++) {
+        if(!isZero(inst->destRegIdx(i))) {
+            if(inst->renamedDestRegIdx(i) < 128) {
+                setIntReg(inst->renamedDestRegIdx(i), corruptedDestRegs[i]);
+            }
+            else if(inst->renamedDestRegIdx(i) < 256)
+                setFloatReg(inst->renamedDestRegIdx(i), corruptedDestRegs[i]);
+        }
+    }
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isAdd(DynInstPtr inst)
+{
+    std::string sym_str = inst->staticInst->getName();
+        
+    if (sym_str.find("add") != string::npos) {
+        return true;
+    } 
+    return false;
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isEor(DynInstPtr inst)
+{
+    std::string sym_str = inst->staticInst->getName();
+        
+    if (sym_str.find("eor") != string::npos) {
+        return true;
+    } 
+    return false;
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isOr(DynInstPtr inst)
+{
+    std::string sym_str = inst->staticInst->getName();
+        
+    if (sym_str.find("orr") != string::npos) {
+        return true;
+    } 
+    return false;
+}
+
+template <class Impl>
+bool
+FullO3CPU<Impl>::isBranch(DynInstPtr inst)
+{
+    std::string sym_str = inst->staticInst->getName();
+        
+    if (sym_str.compare("b") == 0 || sym_str.compare("bl") == 0) {
+        return true;
+    } 
+    return false;
 }
 
 template <class Impl>
@@ -665,7 +1016,7 @@ FullO3CPU<Impl>::tick()
     if((checkFaultRF == 1 || injectFaultRF == 1) && curTick() >= injectTime) {
         //injectedArchRegIdx = -1;
         if(injectFaultRF == 1)
-            injectRF = regFile.flipRegFile(injectLoc);
+            injectRF = regFile.flipRegFile(injectLoc, &originalRegData);
         else
             checkRF = true;
         

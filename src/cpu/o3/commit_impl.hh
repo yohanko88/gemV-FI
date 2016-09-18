@@ -64,6 +64,8 @@
 #include "debug/ExecFaulting.hh"
 #include "debug/O3PipeView.hh"
 #include "debug/FI.hh" //YOHAN
+#include "debug/FaultTrace.hh" //YOHAN
+#include "debug/RegTrace.hh" //YOHAN
 #include "params/DerivO3CPU.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
@@ -1249,36 +1251,138 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         }
     }
     
-    //YOHAN
+    std::string sym_str;
+    Addr sym_addr;
+    Addr cur_pc = head_inst->instAddr();
+    debugSymbolTable->findNearestSymbol(cur_pc, sym_str, sym_addr);
+	
+	int numSrcRegs;
+	if(cpu->isConditional(head_inst))
+		numSrcRegs = head_inst->numSrcRegs() - 1;
+	else
+		numSrcRegs = head_inst->numSrcRegs();
+    
+    //YOHAN: Fautl regisiter update
+    bool traceInst = false;
+    if(cpu->completeInjection && cpu->traceFault == 1) {
+        bool hasFault = false;		
+		
+        for (int i = 0; i < numSrcRegs; i++) {
+            cpu->faultyRegIt = find(cpu->faultyRegs.begin(), cpu->faultyRegs.end(), head_inst->srcRegIdx(i));
+            if(cpu->faultyRegIt != cpu->faultyRegs.end()) {
+              hasFault = true;
+            }
+        }
+        
+        if(hasFault) {
+            cpu->updateDestRegs(head_inst);
+
+            if(head_inst->isStore() && head_inst->readPredicate()){
+                cpu->insertFaultyMems(head_inst->effAddr);
+            }
+            
+            traceInst = true;
+        }
+        
+        else {
+            for (int i = 0; i < head_inst->numDestRegs(); i++) {
+                if(cpu->deleteFaultyRegs(head_inst->destRegIdx(i))) {
+                    traceInst = true;
+                    DPRINTF(FaultTrace, "Faulty Reg %d is masked by overwritten\n", head_inst->destRegIdx(i));
+                }
+            }
+            
+            if(head_inst->isStore()){
+                if(cpu->deleteFaultyMems(head_inst->effAddr)) {
+                    traceInst = true;
+                    DPRINTF(FaultTrace, "Faulty Mem %#x is masked by store\n", head_inst->effAddr);
+                }
+            }
+        }
+        
+        if(head_inst->isLoad()){
+            cpu->faultyMemIt = find(cpu->faultyMems.begin(), cpu->faultyMems.end(), head_inst->effAddr);
+            if(cpu->faultyMemIt != cpu->faultyMems.end()) {
+                for (int j = 0; j < head_inst->numDestRegs(); j++) {
+                    if(!cpu->isFlag(head_inst->destRegIdx(j))) {
+                        cpu->insertFaultyRegs(head_inst->destRegIdx(j));
+                        traceInst = true;
+                    }
+                }
+            }
+        }
+    }
+    
+    //YOHAN: Fault injection
     if(cpu->injectRF && !cpu->completeInjection) {
         for (int i = 0; i < head_inst->numDestRegs(); i++) {
             if(cpu->injectLoc/32 == head_inst->renamedDestRegIdx(i)) {
-                DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
-                cpu->completeInjection = true;
-                cpu->injectRF = false;
+                DPRINTF(FI, "Arch Reg %d Bit Flip in %s: %s (dest)\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()), sym_str);
+                
+                if(cpu->traceFault == 1) {
+                    cpu->insertFaultyRegs(head_inst->destRegIdx(i));
+                    cpu->originalRegs[head_inst->destRegIdx(i)] = cpu->originalRegData;
+                    cpu->completeInjection = true;
+                    cpu->injectRF = false;
+                }
             }
         }
         for (int i = 0; i < head_inst->numSrcRegs(); i++) {
             if(cpu->injectLoc/32 == head_inst->renamedSrcRegIdx(i)) {
-                DPRINTF(FI, "Arch Reg r%d Bit Flip in %s\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+                DPRINTF(FI, "Arch Reg %d Bit Flip in %s: %s (source)\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()), sym_str);
+                
+                if(cpu->traceFault == 1) {
+                    cpu->insertFaultyRegs(head_inst->srcRegIdx(i));
+                    cpu->originalRegs[head_inst->srcRegIdx(i)] = cpu->originalRegData;
+                    cpu->updateDestRegs(head_inst);
+                    
+                    if(head_inst->isStore() && cpu->traceFault == 1){
+                        cpu->insertFaultyMems(head_inst->effAddr);
+                    }
+                }
+                            
                 cpu->completeInjection = true;
                 cpu->injectRF = false;
             }
         }
     }
     
-    //YOHAN
+    //YOHAN: Check fault
     if(cpu->checkRF && !cpu->completeInjection) {
         for (int i = 0; i < head_inst->numDestRegs(); i++) {
             if(cpu->injectLoc/32 == head_inst->renamedDestRegIdx(i)) {
-                DPRINTF(FI, "Arch Reg r%d Bit Non-Flip in %s\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+                DPRINTF(FI, "Arch Reg %d Bit Non-Flip in %s: %s (dest)\n", head_inst->destRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()), sym_str);
+                
+                if(head_inst->readPredicate() && cpu->traceFault == 1) {
+                    if(!cpu->isFlag(head_inst->destRegIdx(i)) && cpu->traceFault == 1) {
+                        cpu->insertFaultyRegs(head_inst->destRegIdx(i));
+                    }
+                }
+                
                 cpu->completeInjection = true;
                 cpu->checkRF = false;
             }
         }
         for (int i = 0; i < head_inst->numSrcRegs(); i++) {
             if(cpu->injectLoc/32 == head_inst->renamedSrcRegIdx(i)) {
-                DPRINTF(FI, "Arch Reg r%d Bit Non-Flip in %s\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()));
+                DPRINTF(FI, "Arch Reg %d Bit Non-Flip in %s: %s (source)\n", head_inst->srcRegIdx(i), head_inst->staticInst->disassemble(head_inst->instAddr()), sym_str);
+                
+                if(head_inst->readPredicate() && cpu->traceFault == 1) {
+                    if(!cpu->isFlag(head_inst->destRegIdx(i))) {
+                        cpu->insertFaultyRegs(head_inst->srcRegIdx(i));
+                    }
+                    
+                    for (int j = 0; j < head_inst->numDestRegs(); j++) {
+                        if(!cpu->isFlag(head_inst->destRegIdx(j)) && cpu->traceFault == 1) {
+                            cpu->insertFaultyRegs(head_inst->destRegIdx(j));
+                        }
+                    }
+                    
+                    if(head_inst->isStore() && cpu->traceFault == 1){
+                        cpu->insertFaultyMems(head_inst->effAddr);
+                    }
+                }
+                            
                 cpu->completeInjection = true;
                 cpu->checkRF = false;
             }
@@ -1293,10 +1397,25 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         //YOHAN
         if(cpu->maxTraceInst == 0)
             head_inst->traceData->dump();
-        else if(cpu->maxTraceInst > cpu->traceInstCnt && cpu->completeInjection) {
+        else if(cpu->maxTraceInst > cpu->traceInstCnt && cpu->completeInjection) {            
             head_inst->traceData->dump();
             cpu->traceInstCnt += 1;
+            for (int j = 0; j < head_inst->numSrcRegs(); j++) {
+                if(head_inst->renamedSrcRegIdx(j) < 128)
+                    DPRINTF(RegTrace, "Src Arch Reg %d value: %#x\n", head_inst->srcRegIdx(j), cpu->readIntReg(head_inst->renamedSrcRegIdx(j)));
+                else if(head_inst->renamedSrcRegIdx(j) < 256)
+                    DPRINTF(RegTrace, "Src Arch Reg %d value: %#x\n", head_inst->srcRegIdx(j), cpu->readFloatReg(head_inst->renamedSrcRegIdx(j)));
+            }
+            
+            for (int j = 0; j < head_inst->numDestRegs(); j++) {
+                if(head_inst->renamedDestRegIdx(j) < 128)
+                    DPRINTF(RegTrace, "Dest Arch Reg %d value: %#x\n", head_inst->destRegIdx(j), cpu->readIntReg(head_inst->renamedDestRegIdx(j)));
+                else if(head_inst->renamedDestRegIdx(j) < 256)
+                    DPRINTF(RegTrace, "Dest Arch Reg %d value: %#x\n", head_inst->destRegIdx(j), cpu->readFloatReg(head_inst->renamedDestRegIdx(j)));
+            }
         }
+        else if(traceInst)
+            head_inst->traceData->dump();
         delete head_inst->traceData;
         head_inst->traceData = NULL;
     }

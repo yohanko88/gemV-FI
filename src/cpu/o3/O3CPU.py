@@ -169,6 +169,7 @@ class DerivO3CPU(BaseCPU):
     injectTime = Param.UInt64(0, "Time to inject fault")
     injectLoc = Param.Unsigned(0, "Bit location to inject fault")
     maxTraceInst = Param.Unsigned(0, "Max trace instruction after fault injection")
+    traceFault = Param.Unsigned(0, "Trace corrupted registers and memory (0: NO, 1: YES)")
 	
     checkFaultPipe = Param.Unsigned(0, "Check a single-bit fault in Piepeline or not (0: NO, 1: YES)")
     checkFaultROB = Param.Unsigned(0, "Check a single-bit fault in ROB or not (0: NO, 1: YES)")

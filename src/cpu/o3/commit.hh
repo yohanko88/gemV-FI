@@ -139,6 +139,9 @@ class DefaultCommit
         RoundRobin,
         OldestReady
     };
+	
+	//YOHAN
+	void updateDestRegs(DynInstPtr &inst);
 
   private:
     /** Overall commit status. */

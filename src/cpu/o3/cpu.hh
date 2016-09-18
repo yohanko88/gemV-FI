@@ -52,6 +52,7 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include <map> //YOHAN
 
 #include "arch/types.hh"
 #include "base/statistics.hh"
@@ -73,6 +74,7 @@
 #include "base/vulnerability/vul_structs.hh"                    //VUL_TRACKER
 #include "base/vulnerability/vul_pipeline.hh"                   //VUL_TRACKER
 #include "base/vulnerability/vul_rename.hh"                   //VUL_TRACKER
+#include "base/callback.hh"                                     //YOHAN: exit callback
 
 template <class>
 class Checker;
@@ -840,11 +842,40 @@ class FullO3CPU : public BaseO3CPU
     bool injectRF;
     bool checkRF;
     bool completeInjection;
+    bool corruptedRF;
+    bool corruptedMem;
+    unsigned traceFault;
     
     unsigned checkFaultRF;
     unsigned checkFaultPipe;
     unsigned checkFaultROB;
     unsigned checkFaultRename;
+    
+    std::list<unsigned int> faultyRegs;
+    std::list<unsigned int>::iterator faultyRegIt;
+    std::list<Addr> faultyMems;
+	bool faultyFlags;
+    uint64_t originalRegData;
+    std::list<Addr>::iterator faultyMemIt;
+    std::map<int, uint64_t> originalRegs;
+	uint64_t * corruptedSrcRegs;
+	uint64_t * corruptedDestRegs;
+	uint64_t corruptedFlags[3];
+    
+    void exitCallback();
+    bool deleteFaultyRegs(int reg_idx);
+    void insertFaultyRegs(int reg_idx);
+    bool deleteFaultyMems(Addr mem_addr);
+    void insertFaultyMems(Addr mem_addr);
+    bool isFlag(int srcRegId);
+    bool isZero(int srcRegId);
+    bool isConditional(DynInstPtr inst);
+    bool isIncorrectBranch(DynInstPtr inst);
+    void updateDestRegs(DynInstPtr inst);
+    bool isAdd(DynInstPtr inst);
+    bool isEor(DynInstPtr inst);
+    bool isOr(DynInstPtr inst);
+    bool isBranch(DynInstPtr inst);
     
     //YOHAN: Add parameters to restore static instruction
     bool changeDest;

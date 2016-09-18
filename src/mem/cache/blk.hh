@@ -121,7 +121,7 @@ class CacheBlk
     int srcMasterId;
     
     /** Access history for data block used in data block vulnerability calculation*/
-    History dataVulHist[4];                                //VUL_CACHE
+    History dataVulHist[64];                                //VUL_CACHE
     //std::vector<History> dataVulHist;
 
     /** Access history for the tags used in tag vulnerability calculation */ 
