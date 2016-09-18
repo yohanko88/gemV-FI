@@ -59,7 +59,7 @@ patricia )
 esac
 
 protection=no_protection								# Protection scheme to be used
-vul_analysis=no								# Enable/Disable vulnerability analysis
+vul_analysis=yes								# Enable/Disable vulnerability analysis
 cpu_type=arm_detailed								# CPU Type
 num_procs=1									# Number of processors
 num_l2=1									# Number of L2 caches
@@ -75,6 +75,4 @@ options3=~/benchmarks/mibench/automotive/qsort/input_small.dat					# Options to 
 gemv_exec_path=./build/$1/gem5.opt		# Path to gemv executable
 config_path=./configs/example/se.py		# Path to config file
 
-$gemv_exec_path -d $2_trace -re --stdout-file=simout_$3_$4 --stderr-file=simerr_$3_$4 --debug-file=GR_$3_$4 --debug-flags=Exec $config_path --cpu-type=$cpu_type --caches --l2cache -n $num_procs --num-l2caches=$num_l2 --l1d_size=$l1d_size --l1i_size=$l1i_size --l2_size=$l2_size --l1d_assoc=$l1d_assoc --l1i_assoc=$l1i_assoc --l2_assoc=$l2_assoc --cacheline_size=$cacheline_size --vul_analysis=$vul_analysis --cache_prot=$protection  -c "$bench_home/$bench" -o "$options" --output=$2_trace/result_$3_$4 --vul_params=./params.in --checkArch=RF --injectTime=$3 --injectLoc=$4 -m $5 --maxTraceInst 1000
-
-$gemv_exec_path -d $2_trace -re --stdout-file=simout_$3_$4 --stderr-file=simerr_$3_$4 --debug-file=FI_$3_$4 --debug-flags=FI,Exec,-ExecTicks $config_path --cpu-type=$cpu_type --caches --l2cache -n $num_procs --num-l2caches=$num_l2 --l1d_size=$l1d_size --l1i_size=$l1i_size --l2_size=$l2_size --l1d_assoc=$l1d_assoc --l1i_assoc=$l1i_assoc --l2_assoc=$l2_assoc --cacheline_size=$cacheline_size --vul_analysis=$vul_analysis --cache_prot=$protection  -c "$bench_home/$bench" -o "$options" --output=$2_trace/result_$3_$4 --vul_params=./params.in --injectArch=RF --injectTime=$3 --injectLoc=$4 -m $5 --maxTraceInst 1000
+$gemv_exec_path -d $2_trace -re --stdout-file=simout_$3_$4 --stderr-file=simerr_$3_$4 --debug-file=FI_$3_$4 --debug-flags=FI,Exec,-ExecTicks,FaultTrace,RegTrace $config_path --cpu-type=$cpu_type --caches --l2cache -n $num_procs --num-l2caches=$num_l2 --l1d_size=$l1d_size --l1i_size=$l1i_size --l2_size=$l2_size --l1d_assoc=$l1d_assoc --l1i_assoc=$l1i_assoc --l2_assoc=$l2_assoc --cacheline_size=$cacheline_size --vul_analysis=$vul_analysis --cache_prot=$protection  -c "$bench_home/$bench" -o "$options" --output=$2_trace/result_$3_$4 --vul_params=./params.in --injectArch=$6 --injectTime=$3 --injectLoc=$4 -m $5 --maxTraceInst=1000 #--traceFault=1 #--take-checkpoints 0,10000
