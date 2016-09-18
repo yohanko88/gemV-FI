@@ -8,35 +8,37 @@ injectArch = sys.argv[3]
 start = sys.argv[4]
 end = sys.argv[5]
 
-if(bench == 'stringsearch'):
-	runtime = 138149500
-elif(bench == 'matmul'):
-	runtime = 20618500
-elif(bench == 'qsort'):
-	runtime = 13467377000
-elif(bench == 'hello'):
+if(bench == 'hello'):
 	runtime = 16169500
-elif(bench == 'bitcount'):
-	runtime = 12314086500
+elif(bench == 'matmul'):
+	runtime = 84996000
+elif(bench == 'stringsearch'):
+	runtime = 138149500
 elif(bench == 'susan'):
-	runtime = 1528159500
-elif(bench == 'dijkstra'):
-	runtime = 25391777500
+	runtime = 1540836000
 elif(bench == 'jpeg'):
 	runtime = 9902426000
 elif(bench == 'gsm'):
 	runtime = 9985126500
+elif(bench == 'bitcount'):
+	runtime = 12314086500
+elif(bench == 'qsort'):
+	runtime = 13467377000
+elif(bench == 'dijkstra'):
+	runtime = 25391777500
 elif(bench == 'basicmath'):
 	runtime = 25391777500
 
 os.system("mkdir " + str(bench))
 #f = open(str(bench) + "/val_" + str(injectArch)+"_"+str(start)+"_"+str(end)+".txt", 'w') 
 
+os.system("rm -rf " + str(bench) + "/val_" + str(injectArch)+"_"+str(start)+"_"+str(end)+".txt")
+
 for i in range(int(start), int(end)):
 	if (injectArch == "NO"):
 		injectLoc = 0
 	if (injectArch == "RF"):
-		injectLoc = random.randrange(0,8192) #32: Data (256 RFs)
+		injectLoc = random.randrange(0,4096) #32: Data (128 integer RFs)
 	if (injectArch == "RenameMap"):
 		injectLoc = random.randrange(0,912) #8: PhysRegIdx (114 Arch Regs)
 	if (injectArch == "HistoryBuffer"):
@@ -63,26 +65,10 @@ for i in range(int(start), int(end)):
 		
 	if (injectArch == "RF"):
 		loop = True
-		# while(loop):
-			# if(bench == "perlbench"):
-				# os.system("./checkS.sh " + str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch))
-			# else:
-				# os.system("./check.sh " + str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch))
-			# data2 = file(bench+"/"+injectArch+"/gemV_"+str(i))
-			# for line1 in data2:
-				# if "Non" in line1 or "ND" in line1:
-					# loop = True
-					# injectLoc = random.randrange(0,8192) #32: Data (256 RFs)
-					# injectTime = random.randrange(0,runtime)
-					# break
-				# else:
-					# loop = False
-					# break
 		os.system("./check.sh " + str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch))
 		data2 = file(bench+"/"+injectArch+"/gemV_"+str(i))
 		for line1 in data2:
 			if "Non-Vulnerable" in line1:
-				#os.system("./inject.sh " + str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch) + " " + str(2*runtime) + " > " + str(bench) + "/FI_" + str(injectArch) + "_" + str(i))
 				print ""
 			else:
 				if(bench == 'susan') or (bench == 'jpeg'):
@@ -94,128 +80,131 @@ for i in range(int(start), int(end)):
 		for line1 in data2:
 			if "Non-Vulnerable" in line1:
 				f.write("NV\t")
-				f.write("NF\n")
-			elif "Non-Decision" in line1:
-				f.write("ND\t")
-				data3 = file(bench+"/FI_" + str(injectArch)+ "_" + str(i))
-				for line2 in data3:
-					line3 = line2.strip().split('\t')
-					if "NF" in line2:
-						f.write("NF" + "\t" + line3[1] + "\t" + line3[2] + '\n')
-					else:
-						f.write("F" + "\t" + line3[1] + "\t" + line3[2] + '\n')
-			elif "Vulnerable" in line1:
+				f.write("NF\t")
+				f.write(str(injectTime) + "\t" + str(injectLoc) + "\n")
+
+			elif "Vulnerable" in line1 or "Non-Decision" in line1:
 				f.write("V\t")
 				data3 = file(bench+"/FI_" + str(injectArch)+ "_" + str(i))
+				
 				for line2 in data3:
 					line3 = line2.strip().split('\t')
 					if "NF" in line2:
-						f.write("NF" + "\t" + line3[1] + "\t" + line3[2] + '\n')
-					else:
-						f.write("F" + "\t" + line3[1] + "\t" + line3[2] + '\n')
-				
-	elif (injectArch == "FetchQueue" or injectArch == "DecodeQueue" or injectArch == "RenameQueue" or injectArch == "I2EQ" or injectArch == "IEWQ" or injectArch == "IQ" or injectArch == "LSQ" or injectArch == "ROB"):
-		os.system("./inject_" + str(bench) + ".sh " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch) + " > " + str(bench) + "/FI_" + str(injectArch) + "_" + str(i))
-		
-		data2 = file(bench+"/"+injectArch+"/FI_"+str(i))
-		for line1 in data2:
-			if "Unused" in line1:
-				f.write("NV\t")
-			else:
-				line2 = line1.strip().split(':')
-				line3 = line2[3].split(' ')
-				
-				if(bench == "perlbench"):
-					os.system("./checkS.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[3]) + " " + str(i) + " " + str(injectArch))
-				else:
-					os.system("./check.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[3]) + " " + str(i) + " " + str(injectArch))
-					
-				data2 = file(bench+"/"+injectArch+"/gemV_"+str(i))
-				for line1 in data2:
-					if "Non" in line1:
-						f.write("NV\t")
-					else:
-						f.write("V\t")
-				
-		data2 = file(bench+"/FI_" + str(injectArch) + "_" + str(i))
-		for line1 in data2:
-			line2 = line1.strip().split('\t')
-			if "NF" in line1:
-				f.write("NF" + "\t" + line2[1] + "\t" + line2[2] + '\n')
-			else:
-				f.write("F" + "\t" + line2[1] + "\t" + line2[2] + '\n')
-				
-	elif (injectArch == "RenameMap"):
-		os.system("./inject_" + str(bench) + ".sh " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch) + " > " + str(bench) + "/FI_" + str(injectArch) + "_" + str(i))
-		
-		data2 = file(bench+"/"+injectArch+"/FI_"+str(i))
-		for line1 in data2:
-
-			line2 = line1.strip().split(':')
-			line3 = line2[3].split(' ')
-			
-			if(bench == "perlbench"):
-				os.system("./checkS.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[4]) + " " + str(i) + " " + str(injectArch))
-			else:
-				os.system("./check.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[4]) + " " + str(i) + " " + str(injectArch))
-				
-			data2 = file(bench+"/"+injectArch+"/gemV_"+str(i))
-			for line1 in data2:
-				if "Non" in line1:
-					f.write("NV\t")
-				else:
-					f.write("V\t")
-		
-		data2 = file(bench+"/FI_" + str(injectArch) + "_" + str(i))
-		for line1 in data2:
-			line2 = line1.strip().split('\t')
-			if "NF" in line1:
-				f.write("NF" + "\t" + line2[1] + "\t" + line2[2] + '\n')
-			else:
-				f.write("F" + "\t" + line2[1] + "\t" + line2[2] + '\n')
-				
-	elif (injectArch == "HistoryBuffer"):
-		os.system("./inject_" + str(bench) + ".sh " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch) + " > " + str(bench) + "/FI_" + str(injectArch) + "_" + str(i))
-		
-		data2 = file(bench+"/"+injectArch+"/FI_"+str(i))
-		for line1 in data2:
-			if "Unused" in line1:
-				f.write("NV\t")
-			else:
-				line2 = line1.strip().split(':')
-				line3 = line2[3].split(' ')
-
-				if "PrevPhysical" in line1 or "Sequence" in line1:
-					if(bench == "perlbench"):
-						os.system("./checkS.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[3]) + " " + str(i) + " PrevHistoryBuffer")
-					else:
-						os.system("./check.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[3]) + " " + str(i) + " PrevHistoryBuffer")
-						
-					data2 = file(bench+"/PrevHistoryBuffer/gemV_"+str(i))
-					for line1 in data2:
-						if "Non" in line1:
-							f.write("NV\t")
+						f.write("NF\t")
+						f.write(str(injectTime) + "\t" + str(injectLoc) + "\t")
+						if(bench == 'susan') or (bench == 'jpeg'):
+							os.system("./analysis_output.sh " +str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(runtime*2) + " " + injectArch + " " + str(i))
 						else:
-							f.write("V\t")
-				else:					
-					if(bench == "perlbench"):
-						os.system("./checkS.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[3]) + " " + str(i) + " NewHistoryBuffer")
-					else:
-						os.system("./check.sh " + str(bench) + " " + str(line2[0]) + " " + str(line3[3]) + " " + str(i) + " NewHistoryBuffer")
+							os.system("./analysis.sh " +str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(runtime*2) + " " + injectArch)
 						
-					data2 = file(bench+"/NewHistoryBuffer/gemV_"+str(i))
-					for line1 in data2:
-						if "Non" in line1:
-							f.write("NV\t")
+						incorrectMemAddr = False
+						incorrectBranch = False
+						memTransfer = False
+						numMemTrasfer = 0
+						overwritten = False
+						numOverwritten = 0
+						compare = False
+						numCompare = 0
+						logical = False
+						numLogical = 0
+						faulty = False
+						
+						fi = file(str(bench) + "_trace/FI_" + str(injectTime) + "_" + str(injectLoc))
+						for fi_line in fi:
+							if "Incorrect Mem Addr" in fi_line:
+								incorrectMemAddr = True
+								break
+								
+							elif "Incorrect branch" in fi_line:
+								incorrectBranch = True
+								break
+								
+							elif "is faulty" in fi_line:
+								faulty = True
+								break
+								
+							elif "Masked by read-write (register and memory)" in fi_line:
+								memTransfer = True
+								
+							elif "masked by overwritten" in fi_line:
+								overwritten = True
+								
+							elif "masked by cmps" in fi_line:
+								compare = True
+								
+							elif "masked by and" in fi_line or "masked by orr" in fi_line:
+								logical = True
+								
+							elif "Bit Flip in" in fi_line:
+								flip_line = fi_line.strip().split()
+								f.write("r" + flip_line[4] + "\t"  + flip_line[len(flip_line)-2] + "\t")
+
+						if(int(flip_line[4]) == 37 and int(injectLoc) % 32 > 1):
+							f.write("\t\t\t\t\t\t\t" + "incorrect flag flip\n")
+						elif(int(flip_line[4]) == 38 and int(injectLoc) % 32 > 0):
+							f.write("\t\t\t\t\t\t\t" + "incorrect flag flip\n")
+						elif(int(flip_line[4]) == 39 and int(injectLoc) % 32 > 0):
+							f.write("\t\t\t\t\t\t\t" + "incorrect flag flip\n")
+						elif(faulty):
+							f.write("\t\t\t\t\t" + "faulty data\n")
+						elif(incorrectBranch):
+							f.write("\t\t\t\t" + "incorrect branch\n")
+						elif(incorrectMemAddr):
+							f.write("\t\t\t\t\t\t" + "incorrect memory address\n")
+
 						else:
-							f.write("V\t")
-				
-		data2 = file(bench+"/FI_" + str(injectArch) + "_" + str(i))
+							if(memTransfer):
+								f.write("memory trasfer" + "\t")
+							else:
+								f.write("\t")
+							if(overwritten):
+								f.write("overwritten" + "\t")
+							else:
+								f.write("\t")
+							if(compare):
+								f.write("compare" + "\t")
+							else:
+								f.write("\t")
+							if(logical):
+								f.write("logical" + "\t\n")
+							else:
+								f.write("\t\n")
+						
+					else:
+						f.write("F\t")
+						f.write(str(injectTime) + "\t" + str(injectLoc) + "\t\n")
+						
+	else:
+		loop = True
+		os.system("./check.sh " + str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch))
+		data2 = file(bench+"/"+injectArch+"/gemV_"+str(i))
 		for line1 in data2:
-			line2 = line1.strip().split('\t')
-			if "NF" in line1:
-				f.write("NF" + "\t" + line2[1] + "\t" + line2[2] + '\n')
+			if "Non-Vulnerable" in line1:
+				print ""
 			else:
-				f.write("F" + "\t" + line2[1] + "\t" + line2[2] + '\n')
+				if(bench == 'susan') or (bench == 'jpeg'):
+					os.system("./inject_output.sh " + str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch) + " " + str(2*runtime) + " > " + str(bench) + "/FI_" + str(injectArch) + "_" + str(i))
+				else:
+					os.system("./inject.sh " + str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(i) + " " + str(injectArch) + " " + str(2*runtime) + " > " + str(bench) + "/FI_" + str(injectArch) + "_" + str(i))
+		
+		data2 = file(bench+"/"+injectArch+"/gemV_"+str(i))
+		for line1 in data2:
+			if "Non-Vulnerable" in line1:
+				f.write("NV\t")
+				f.write("NF\t")
+				f.write(str(injectTime) + "\t" + str(injectLoc) + "\n")
+
+			elif "Vulnerable" in line1 or "Non-Decision" in line1:
+				f.write("V\t")
+				data3 = file(bench+"/FI_" + str(injectArch)+ "_" + str(i))
+				
+				for line2 in data3:
+					line3 = line2.strip().split('\t')
+					if "NF" in line2:
+						f.write("NF\t")
+						f.write(str(injectTime) + "\t" + str(injectLoc) + "\t\n")
+						os.system("./compare.sh " +str(arch) + " " + str(bench) + " " + str(injectTime) + " " + str(injectLoc) + " " + str(runtime*2) + " " + str(injectArch))
+					else:
+						f.write("F\t")
+						f.write(str(injectTime) + "\t" + str(injectLoc) + "\t\n")
 	f.close()
-#f.close()
